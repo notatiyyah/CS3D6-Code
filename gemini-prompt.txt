@@ -1,83 +1,127 @@
-"Role: You are an expert NLP Data Annotator specialising in UK Social Housing and Vulnerability assessments.
-Task: I will provide a list of support notes. For each note, you must identify vulnerabilities and risks based on the provided taxonomy and link them to the correct person or pronoun using a `Vulnerability -> Person` relationship
+Role: You are an expert NLP Data Annotator specialising in UK Social Housing and Vulnerability assessments.
+
+Task: I will provide a list of support notes. For each note, you must:
+1. Identify vulnerability and risk spans based on the provided taxonomy
+2. Identify all entity spans that a vulnerability could be linked to
+3. Link vulnerability spans to entity spans using a `Vulnerability -> Entity` relationship
 
 The Taxonomy (CSV Reference):
-category_description,values_hint,cat_label
-Sensory Disability,`['Deaf', 'Hearing impairment', 'Visually impaired', 'Partially sighted', 'Deafblindness', 'Speech impairment']`,cat_disability_disability_sensory
-Requires adapted property,`['Minor adaptations', 'Major adaptation']`,cat_disability_adaptation_requires_adapted_property
-Domestic abuse,`['Alleged Perpetrator', 'Survivor']`,cat_safety_risk_safety_risk_domestic_abuse
-Fire-related risks,`['Arson', 'Fire hazards in the house']`,cat_safety_risk_safety_risk_firerelated_risks
-Risk of exploitation,`['Financial', 'Sexual', 'Criminal', 'Cuckooing', 'Radicalisation', 'Modern slavery']`,cat_safety_risk_safety_risk_risk_of_exploitation
-Anti-Social Behaviour,`['Perpetrator of harassment', 'Victim of harassment', 'Perpetrator of hate crime', 'Victim of hate crime']`,cat_safety_risk_safety_risk_antisocial_behaviour
-Children at risk,`['Y, N']`,cat_safety_risk_safety_risk_children_at_risk
-Criminal activity,['examples needed'],cat_safety_risk_safety_risk_criminal_activity
-Gas Capped,`['Resident choice', 'Financial issues', 'Access issues']`,cat_safety_risk_safety_risk_gas_capped
-Gambling,`['Y, N']`,cat_vulnerability_addiction_gambling
-Substance misuse,`['Alcohol', 'Drug']`,cat_vulnerability_addiction_substance_misuse
-Social care involvement,`['Adult Social Care', ``Children's Social Care``]`,cat_vulnerability_care_social_care_involvement
-Has caring responsibility,`['Formal', 'Informal']`,cat_vulnerability_care_has_caring_responsibility
-Mental capacity,`['Has advocate', 'Has court appointed advocate', 'Local Authority advocate', 'Informal arrangement (e.g. family contact)']`,cat_vulnerability_health_mental_capacity
-Neurodiversity / Learning Disability,`['Autism Spectrum Disorder', 'ADHD', 'Dyslexia']`,cat_vulnerability_health_neurodiversity_learning_disability
-Cognitive impairment,`['Dementia', 'Mild Cognitive Impairment']`,cat_vulnerability_health_cognitive_impairment
-Reproductive,`['Pregnancy', 'Birth, inc stillbirth', 'Miscarriage', 'Menopause']`,cat_vulnerability_health_reproductive
-Very young children in household,`['Y, N']`,cat_vulnerability_health_very_young_children_in_household
-Breathing (respiratory) problems,`['Asthma', 'Allergies', 'COPD']`,cat_vulnerability_health_breathing_respiratory_problems
-Mental Health,`['Current suicidal thoughts', 'Recent suicidal thoughts', 'Low mood', 'Motivation', 'Depression', 'Anxiety']`,cat_vulnerability_health_mental_health
-Social Isolation,`['Y, N']`,cat_vulnerability_health_social_isolation
-`Children EHCP (Education, Health and Care Plan)`,`['Y, N']`,cat_vulnerability_health_children_ehcp_education_health_and_care_plan
-Basic needs,`['No gas', 'No electric', 'No water']`,cat_vulnerability_housing_conditions_basic_needs
-Home in disrepair,`['Y, N']`,cat_vulnerability_housing_conditions_home_in_disrepair
-Infestation,`['Rats / mice', 'Daddy long-legs', 'Silver fish', 'Cockroaches', 'Bed bugs', 'Fleas']`,cat_vulnerability_housing_conditions_infestation
-Self-neglect,`['Clutter', 'Hoarding', 'Unmanaged mess']`,cat_vulnerability_housing_conditions_selfneglect
-Damp & Mould,`['Damp', 'Mould', 'Leaks']`,cat_vulnerability_housing_conditions_damp_mould
-Overcrowding,`['Awaiting rehousing / home swap', 'Needs to apply for rehousing / home swap']`,cat_vulnerability_housing_conditions_overcrowding
-Former refugee / asylum seeker,`['Y, N']`,cat_vulnerability_life_events_former_refugee_asylum_seeker
-Bereavement,`['Grief', 'Relationship loss']`,cat_vulnerability_life_events_bereavement
-Left institution ,`['Prison', 'Hospital', 'Hospice', 'Children’s home', 'Supported housing', 'Domestic abuse refuge', 'Temporary accommodation']`,cat_vulnerability_life_events_left_institution
-Currently rehoused / decanted,`['Temporary accomodation', 'Hotel', 'Other Council property?']`,cat_vulnerability_life_events_currently_rehoused_decanted
-In Prison,`['Y, N']`,cat_vulnerability_life_events_in_prison
-Homelessness,`['Street homeless', 'Sofa surfing']`,cat_vulnerability_life_events_homelessness
-Care (General),`['Y, N', 'Y, N', 'Fostered', 'Social care', 'Hospice (respite)', 'Hospice (longer-term care)', 'Hospital', 'Care home', 'Staying with family', 'Staying with friends']`,cat_vulnerability_care
-Financial (General),`['Long term unemployment', 'Not receiving correct benefits', 'Food - immediate help', 'Fuel - immediate help', 'Y, N']`,cat_vulnerability_financial
-Health (Chronic),`['Terminally ill', 'Frailty', 'Weakened immune system', 'Chronic illness']`,cat_vulnerability_health_general
-Mobility,`['Wheelchair user', 'Limited mobility (could be a type / hyphen)', 'Zimmer frame', 'Walking stick', 'Rollator', 'Cared for in bed (entirely)', 'Cared for in bed (partially)', 'Frail', 'History of falls', 'Poor mobility']`,cat_vulnerability_mobility
-Communication needs,`['No access to the internet', 'No access to digital device', ``Can't use digital communication``, 'A Little English', 'Appropriate for Age', 'Does not Wish to Reply', 'Good (Both Written and Spoken)', 'None (Does not Understand)', 'Sign Language or Other Method of Communication', 'BSL', 'Hearing Loop', 'Braille', 'Large Print', 'Translator']`,cat_service_need_communication
-Violence Risk,`['Gang association', 'Targetted by gang', 'examples needed']`,cat_safety_risk_safety_risk_violence_general
+cat_label,category_description,values_hint
+care_care_experienced,Care experienced,"["Care leaver", "Care experienced (under 25)"]"
+care_care_setting,Care setting,"["Fostered", "Social care"]"
+care_has_caring_responsibility,Has caring responsibility,"["Formal", "Informal"]"
+care_social_care_involvement,Social care involvement,"["Adult Social Care", ""Children"s Social Care""]"
+cautions_asbo_or_injunction_obtained,ASBO or injunction obtained,"["ASBO", "Injunction"]"
+cautions_dangerous_animals,Dangerous Animals,"["Dog", "Reptile", "Other"]"
+cautions_physical_abuse_or_threat_of,Physical Abuse or Threat of,"["Physical Abuse (actual)", "Physical Abuse (threat)"]"
+cautions_unclean_unsafe_living_environment,Unclean / Unsafe Living Environment,"["Unclean and / or unsanitary", "Unsafe e.g. undisposed sharps"]"
+cautions_verbal_abuse_or_threat_of,Verbal Abuse or Threat of,"["Verbal Abuse (actual)", "Verbal Abuse (threat)"]"
+reasonable_adjustments_communication_needs,Communication needs,"["BSL", "Hearing Loop", "Braille", "Large Print", "Easy Read", "Translator"]"
+communication_digital_exclusion,Digital Exclusion,"["No access to the internet", "No access to digital device", ""Can"t use digital communication""]"
+communication_fluency_in_english,Fluency in English,"["A Little English", "Appropriate for Age", "Does not Wish to Reply", "Good (Both Written and Spoken)", "None (Does not Understand)", "Sign Language or Other Method of Communication"]"
+disability_requires_adapted_property,Requires adapted property,"["Minor adaptations", "Major adaptation"]"
+disability_sensory,Sensory,"["Deaf", "Hearing impairment", "Visually impaired", "Partially sighted", "Deafblindness", "Speech impairment", "Poor sense of smell / taste"]"
+health_substance_misuse,Substance misuse,"["Alcohol", "Drug"]"
+health_breathing_respiratory_problems,Breathing (respiratory) problems,"["Asthma", "Allergies", "COPD"]"
+health_care_setting,Care setting,"["Hospice (respite)", "Hospice (longer-term care)", "Hospital", "Care home", "Staying with family", "Staying with friends", "Post-hospital recovery at home"]"
+health_cognitive_impairment,Cognitive impairment,"["Dementia", "Mild Cognitive Impairment", "Developmental Condition"]"
+reasonable_adjustments_mental_capacity,Mental capacity,"["Has advocate", "Has court appointed advocate", "Local Authority advocate", "Client Financial Affairs Team", "Informal arrangement (e.g. family contact)"]"
+health_neurodiversity_learning_disability,Neurodiversity / Learning Disability,"["Autism Spectrum Disorder", "ADHD", "Dyslexia"]"
+health_medical_condition,Medical Condition,"["Frailty", "Weakened immune system", "Chronic illness"]"
+health_mental_health,Mental Health,"["Anxiety", "Depression", "Obsessive Compulsive Disorder", "Other mental health condition"]"
+health_terminally_ill,Terminally ill,["Terminally ill"]
+health_medical_life_sustaining,Medical / Life sustaining,"["Nebuliser and apnoea monitor", "Heart, lung & ventilator", "Dialysis, feeding pump and automated medication", "Oxygen concentrator", "Water dependent", "Other Medical Equipment"]"
+housing_conditions_utilities,Utilities,"["No gas", "No electric", "No water"]"
+housing_conditions_hoarding,Hoarding,"["Clutter Image Rating 1-3", "Clutter Image Rating 4-6", "Clutter Image Rating 7-9"]"
+life_events_social_isolation,Social Isolation,["Social Isolation"]
+life_events_life_events,Life events,"["Ex service personnel", "In prison", "Left prison"]"
+life_events_temporary,Temporary,"["Bereavement", "Pregnancy"]"
+mobility_mobility_physical,Mobility - physical,"["Frail", "History of falls", "Limited mobility: Zimmer frame", "Limited mobility: Walking stick", "Limited mobility: Rollator", "Limited mobility: Cared for in bed (entirely)", "Limited mobility: Cared for in bed (partially)", "Stairlift", "Hoist", "Wheelchair user"]"
+mobility_service_need,Service need,"["Unable to answer door", "Allow time to answer door", "Prepayment Meter - can’t access", "Personal Emergency Evaculation Plan (PEEP)"]"
+property_level_property_adapted,Property adapted,"["Minor adaptations", "Major adaptation"]"
+property_level_disrepair_damp_mould,"Disrepair, damp & mould","["Disrepair", "Damp", "Mould", "Leaks"]"
+property_level_infestation,Infestation,"["Rats / mice", "Daddy long-legs", "Silver fish", "Cockroaches", "Bed bugs", "Fleas"]"
+safety_risk_antisocial_behaviour,Anti-Social Behaviour,"["Perpetrator of harassment", "Victim of harassment", "Perpetrator of hate crime", "Victim of hate crime"]"
+safety_risk_domestic_abuse,Domestic abuse,"["Alleged Perpetrator", "Abusive person", "Survivor"]"
+safety_risk_firerelated_risks,Fire-related risks,"["Arson", "Fire hazards in the house"]"
+safety_risk_gas_capped,Gas Capped,"["Resident choice", "Financial issues", "Access issues"]"
+safety_risk_risk_of_exploitation,Risk of exploitation,"["Financial", "Sexual", "Criminal", "Cuckooing", "Radicalisation", "Modern slavery"]"
 
 Annotation Rules:
-Span Extraction: Identify the exact text string representing the vulnerability.
-Entity Linking: Link the vulnerability to the specific person it affects. Use the rule: Vulnerability $\rightarrow$ Person/Pronoun.
-Pre-annotations: Respect existing [Pseudonym] or [Descriptive Role] tags. If PII other than a name (phone, email, ID) was missed by the previous system, label it as `Missed Other PII`.
-Disambiguation: If multiple people are mentioned (e.g., `Abdul and his daughter`), ensure the `Breathing problems` label points to the daughter if the text specifies it's her cough.
+
+1. Vulnerability Spans: Identify the exact text string representing the vulnerability or risk. Apply the closest matching taxonomy label. Apply multiple labels to a single span if it implies more than one vulnerability.
+
+2. Entity Spans: Tag every span that a vulnerability could be linked to. There are two entity types:
+   - `Person_Role`: a descriptive role or pseudonym e.g. "tenant", "his mother", "the children", "[Person2]"
+   - `Person_Pronoun`: a pronoun that is the primary reference to a person in the absence of a nearby role e.g. "she" in "she has asthma" where no role has been recently established
+
+   Do not tag every pronoun — only tag a pronoun when it is doing the work of identifying who a vulnerability belongs to and there is no role span nearby to link to instead.
+
+3. Entity Linking: Link each vulnerability span to the entity span it belongs to using a `Vulnerability -> Entity` relationship. If a vulnerability span cannot be linked to any entity (the person is unidentifiable from context), leave it unlinked.
+
+4. Disambiguation: If multiple people are mentioned, ensure each vulnerability is linked to the correct person. For example, if the note mentions a tenant and her daughter, link breathing problems to the daughter if the text specifies it is her condition.
 
 Output Format:
-Return the data in a simplified JSON list so I can import it. For each note, provide:
+Return the data as a JSON object with two keys:
+- `labels`: a list of {`text`: <span>, `label`: <label>}
+- `links`: a list of {`from`: <vulnerability span>, `to`: <entity span>}
 
-labels: A list of {`text`: `span`, `label`: `Category Name`}
-links: A list of {`from`: `Vulnerability`, `to`: `Person/Pronoun/Role`}
+Examples:
 
-Example:
 Input:
 {
-    `note_content`: `[Category: tenureManagement] Tenants was arrested  I received a call from the tenant's wife and son, informing me that the tenant had been arrested for coercive behavior. They further stated that the tenant has since been released on bail and is currently staying with friends and family, with restrictions preventing him from returning to the property.\n\nThe tenant's wife inquired whether her name was on the tenancy agreement, which it is not. I informed her that due to the seriousness of the situation, we will need to conduct a risk assessment at the office. She requested that this assessment be scheduled for <DATE_TIME>.\n\nThe wife stated that she wants to speak with her husband first to see if he will agree to transfer the tenancy into her name before proceeding with any other action.\n\nI provided them with my direct contact number and asked them to call immediately if the circumstances change.`,
-    `id`: `bf45fd19-6334-43d9-80d7-d131ee9a3cfe`
+    "note_content": "[Category: vulnerability] Visited the property today. Tenant has been struggling with depression and anxiety and states she has not been leaving the house. Her teenage son James has been missing school and neighbours have raised concerns about shouting and banging heard from the flat. Tenant mentioned her mother visits daily to help with cooking and personal care as she has limited mobility following a hip operation.",
+    "id": "a1b2c3d4-0001"
 }
 
 Output:
 {
-    labels: [
-        {`text`: `tenant`, `label`: `Descriptive Role`},
-        {`text`: `tenant's wife`, `label`: `Descriptive Role`},
-        {`text`: `arrested`, `label`: `cat_safety_risk_safety_risk_criminal_activity`},
-        {`text`: `released on bail`, `label`: `cat_safety_risk_safety_risk_criminal_activity`},
-        {`text`: `staying with friends`, `label`: `cat_vulnerability_life_events_currently_rehoused_decanted`},    
+    "labels": [
+        {"text": "Tenant", "label": "Person_Role"},
+        {"text": "James", "label": "Person_Role"},
+        {"text": "her mother", "label": "Person_Role"},
+        {"text": "depression and anxiety", "label": "health_mental_health"},
+        {"text": "not been leaving the house", "label": "life_events_social_isolation"},
+        {"text": "shouting and banging heard from the flat", "label": "cautions_verbal_abuse_or_threat_of"},
+        {"text": "visits daily to help with cooking and personal care", "label": "care_has_caring_responsibility"},
+        {"text": "limited mobility following a hip operation", "label": "mobility_mobility_physical"}
     ],
-    links: [
-        {`from`: `arrested`, `to`: `tenant`},
-        {`from`: `released on bail`, `to`: `tenant`},
-        {`from`: `staying with friends`, `to`: `tenant`}
+    "links": [
+        {"from": "depression and anxiety", "to": "Tenant"},
+        {"from": "not been leaving the house", "to": "Tenant"},
+        {"from": "limited mobility following a hip operation", "to": "Tenant"},
+        {"from": "visits daily to help with cooking and personal care", "to": "her mother"}
     ]
 }
 
-Overlapping Spans: Apply multiple labels to a single span if it implies more than one vulnerability or risk.
-Implicit Entities: If a vulnerability is mentioned but lacks an explicit person or pronoun in the text, extract the vulnerability span but leave it unlinked."
+Note: "shouting and banging heard from the flat" is left unlinked — the note does not specify who is responsible.
+
+Input:
+{
+    "note_content": "[Category: tenureManagement] Received a call from Tenant"s support worker. Tenant was recently discharged from hospital following a mental health crisis and is currently staying with his sister at an unknown address. Support worker confirmed Tenant has a care package in place and requires a wet room adaptation to return to the property. Support worker"s number is 07123456789.",
+    "id": "a1b2c3d4-0002"
+}
+
+Output:
+{
+    "labels": [
+        {"text": "Tenant", "label": "Person_Role"},
+        {"text": "support worker", "label": "Person_Role"},
+        {"text": "his sister", "label": "Person_Role"},
+        {"text": "discharged from hospital", "label": "health_care_setting"},
+        {"text": "mental health crisis", "label": "health_mental_health"},
+        {"text": "discharged from hospital following a mental health crisis", "label": "life_events_life_events"},
+        {"text": "staying with his sister", "label": "health_care_setting"},
+        {"text": "care package in place", "label": "care_social_care_involvement"},
+        {"text": "wet room adaptation", "label": "disability_requires_adapted_property"},
+        {"text": "07700 900142", "label": "Missed_Other_PII"}
+    ],
+    "links": [
+        {"from": "discharged from hospital", "to": "Tenant"},
+        {"from": "mental health crisis", "to": "Tenant"},
+        {"from": "discharged from hospital following a mental health crisis", "to": "Tenant"},
+        {"from": "staying with his sister", "to": "Tenant"},
+        {"from": "care package in place", "to": "Tenant"},
+        {"from": "wet room adaptation", "to": "Tenant"}
+    ]
+}
