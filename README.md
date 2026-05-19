@@ -92,6 +92,8 @@ The taxonomy covers **11 high-level categories** of Additional Needs:
 
 See [`annotation/annotation_codebook.md`](annotation/annotation_codebook.md) for full label definitions, value hints, and annotation rules.
 
+![image](annotation/label-studio-ui-screenshot.png)
+
 ---
 
 ## AWS setup

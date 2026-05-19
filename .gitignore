@@ -1,5 +1,7 @@
-data/*
 .vscode/*
 .venv/*
 __pycache__/*
 .DS_Store
+
+data/*
+annotation/label-studio-ui.xml

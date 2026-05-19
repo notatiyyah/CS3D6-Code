@@ -30,6 +30,8 @@ For each housing case note, annotators produce three things:
 - **Entity Spans**: Text substrings that identify a person (by name, role or pronoun), so vulnerabilities can be attributed correctly.
 - **Links**: Directed relationships *from a vulnerability span* *to the entity span* it belongs to. Leave a vulnerability unlinked when the responsible person is unidentifiable from context. `Property Level` ANs will *never* be linked to an entity.
 
+![image](annotation/label-studio-ui-screenshot.png)
+
 ---
 
 ## Entity Types
