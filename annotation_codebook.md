@@ -5,16 +5,17 @@
 * [Overview](#overview)
 * [Entity Types](#entity-types)
 * [Additional Needs Types](#additional-needs-types)
-    * [Care](#care)
-    * [Cautions](#cautions)
-    * [Communication](#communication)
-    * [Disability](#disability)
-    * [Health](#health)
-    * [Housing Conditions](#housing-conditions)
-    * [Life Events](#life-events)
-    * [Mobility](#mobility)
-    * [Property](#property)
-    * [Safety & Risk](#safety--risk)
+    * [<mark style="background-color: #58D68D;">Care</mark>](#care)
+    * [<mark style="background-color: #CD6155;">Cautions</mark>](#cautions)
+    * [<mark style="background-color: #7787EF;">Reasonable Adjustments</mark>](#reasonable-adjustments)
+    * [<mark style="background-color: #F4D03F;">Communication</mark>](#communication)
+    * [<mark style="background-color: #D09DF6;">Disability</mark>](#disability)
+    * [<mark style="background-color: #48C9C0;">Health</mark>](#health)
+    * [<mark style="background-color: #F086F0;">Housing Conditions</mark>](#housing-conditions)
+    * [<mark style="background-color: #EB984E;">Life Events</mark>](#life-events)
+    * [<mark style="background-color: #7FB3D5;">Mobility</mark>](#mobility)
+    * [<mark style="background-color: #B5B9C2;">Property Level</mark>](#property-level)
+    * [<mark style="background-color: #EC7063;">Safety & Risk</mark>](#safety--risk)
 * [Edge Cases](#edge-cases)
 
 ---
@@ -27,7 +28,7 @@ For each housing case note, annotators produce three things:
 
 - **Additional Needs Spans**: Exact text spans / substrings that idenify a vulnerability or risk, labelled with the closest AN category. A single span may carry multiple labels if it implies multiple vulnerabilities.
 - **Entity Spans**: Text substrings that identify a person (by name, role or pronoun), so vulnerabilities can be attributed correctly.
-- **Links** Directed relationships *from a vulnerability span* *to the entity span* it belongs to. Leave a vulnerability unlinked when the responsible person is unidentifiable from context.
+- **Links**: Directed relationships *from a vulnerability span* *to the entity span* it belongs to. Leave a vulnerability unlinked when the responsible person is unidentifiable from context. `Property Level` ANs will *never* be linked to an entity.
 
 ---
 
