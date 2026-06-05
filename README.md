@@ -31,7 +31,7 @@ Annotations are produced in [Label Studio](https://labelstud.io/) and used to fi
 │   └── label-studio-ui-template.xml   # Template for the Label Studio annotation interface
 │
 ├── reference/                          # Copied from the infrastructure repo — not run here
-│   ├── additional-needs-reshape.py     # Airflow DAG script: reshapes raw notes and writes to S3/Glue
+│   ├── additional-needs-reshape.py     # Airflow DAG script: reshapes raw notes and writes to 
 │   └── sql/
 │       └── notes-reshape.sql           # SQL query used by the reshape script
 │

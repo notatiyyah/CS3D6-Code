@@ -1,7 +1,23 @@
-.vscode/*
-.venv/*
-__pycache__/*
+# macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
 
-data/*
+# VS Code workspace settings
+.vscode/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python bytecode/cache directories (matches globally across all subfolders)
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Local data directory (ignores all data, logs, and outputs)
+data/
+
+# Label Studio UI configuration file
 annotation/label-studio-ui.xml
