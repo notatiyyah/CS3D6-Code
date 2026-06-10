@@ -37,23 +37,23 @@ For each housing case note, annotators produce three things:
 ## Entity Types
 
 ### `Person_Name`
-A person's name or pseudonym/
+A person's name or pseudonym.
 
 **Examples:** `"Eva Smith", "Jane Doe", "John Doe"`
 
 ### `Person_Role`
 
-A descriptive role, relationship, used to refer to a person.
+A descriptive role or relational label used to refer to a person.
 
 **Examples:** `"tenant", "his mother", "the children", "support worker", "her teenage son", "flat no. 6"`
 
 ### `Person_Pronoun`
 
-A pronoun that is the primary reference to a person where no nearby role span exists to link to.
+A pronoun that is the primary reference to a person where no nearby name or role span exists.
 
-**When to use:** Tag "she" in "she has asthma" only if no role (e.g. "tenant") or name has been established nearby. Do **not** tag every pronoun. Only use when the pronoun is doing the attributional work.
+**When to use:** Tag "she" in "she has asthma" only if no role (e.g. "tenant") or name has been established nearby. Do **not** tag every pronoun — only use when the pronoun is doing the sole attributional work.
 
-*Note: Tag entities even if they have no ANs of their own. E.g. a mentioned family member.*
+> **Scope:** Tag every person mentioned in the note, even if they have no vulnerability of their own (e.g. a family member mentioned in passing, or a person identified as the source of a risk). The purpose of entity tagging is attribution — any person a vulnerability might be linked to should be tagged.
 
 ---
 
@@ -116,7 +116,7 @@ A pronoun that is the primary reference to a person where no nearby role span ex
 | `health_cognitive_impairment` | Dementia · Mild Cognitive Impairment · Developmental Condition | |
 | `health_neurodiversity_learning_disability` | Autism Spectrum Disorder · ADHD · Dyslexia | |
 | `health_medical_condition` | Frailty · Weakened immune system · Chronic illness | Chronic conditions not covered by a more specific label (e.g. diabetes, kidney disease, cancer if not terminal) |
-| `health_mental_health` | Anxiety · Depression · OCD · Other mental health condition | "Mental health crisis", "mental health breakdown", named conditions. "Struggling" or "not coping" alone is too vague — include only if mental health is reasonably implied by context. |
+| `health_mental_health` | Anxiety · Depression · OCD · Other mental health condition | "Mental health crisis", "mental health breakdown", named conditions. **Do not apply** for vague phrases like "struggling", "not coping", "sounds low", or "very stressed" alone — mental health must be reasonably implied by context, not just inferred from general distress. |
 | `health_terminally_ill` | Terminally ill | End-of-life care, palliative care, terminal diagnosis. Also consider `health_care_setting` (hospice). |
 | `health_medical_life_sustaining` | Nebuliser · Heart/lung/ventilator · Dialysis · Oxygen concentrator · Water dependent · Other medical equipment | Any equipment the person depends on for survival — especially relevant to utilities failures |
 
@@ -137,7 +137,7 @@ A pronoun that is the primary reference to a person where no nearby role span ex
 |---|---|---|
 | `life_events_social_isolation` | Social Isolation | Not leaving the house, no social contacts, housebound due to anxiety or condition, withdrawn from community |
 | `life_events_life_events` | Ex service personnel · In prison · Left prison | Narrowly-defined set — do not use for general life disruption. Use `life_events_temporary` for bereavement/pregnancy. |
-| `life_events_temporary` | Bereavement · Pregnancy | |
+| `life_events_temporary` | Bereavement · Pregnancy | Do **not** use `health_care_setting` for bereavement or pregnancy. A tenant whose parent has died is a `life_events_temporary` — not a care setting event. |
 
 ---
 
@@ -179,10 +179,15 @@ A pronoun that is the primary reference to a person where no nearby role span ex
 | Note says "needs a wet room" (tenant wants it but doesn't have it) | `disability_requires_adapted_property` |
 | Note says "property has a wet room already fitted" | `property_level_property_adapted` |
 | Note says "staying with family" — is this care setting or just a location? | `health_care_setting` if the person is displaced from their property due to health/vulnerability. Omit if it is incidental context only. |
+| Note mentions bereavement or pregnancy | `life_events_temporary` — never `health_care_setting` |
+| Note references being fostered or growing up in social care (background history) | `care_care_setting` |
+| Note references current placement in hospital, care home, hospice, or staying with family due to health | `health_care_setting` |
 | Physical altercation in a domestic context | Apply both `safety_risk_domestic_abuse` and `cautions_physical_abuse_or_threat_of` if both are clearly implied. |
 | Note says "Client is fleeing her husband's domestic abuse" | Link `safety_risk_domestic_abuse` to the client entity. If a span describes the husband's behaviour directly, link that to the husband entity. |
 | Note mentions a condition of a household member who is not the tenant | Tag the member as a `Person_Role` entity. Link the vulnerability to that entity, not to "Tenant". |
 | "Mental health crisis" — which label? | `health_mental_health`. If hospitalisation is mentioned, also `health_care_setting` for the hospitalisation span. |
+| "Sounds low" / "struggling" / "stressed" — which label? | None, unless mental health is clearly implied by context. Vague distress alone does not qualify. |
 | Carer mentioned but no vulnerability described for them | Still tag as `Person_Role`. Apply `care_has_caring_responsibility` to the caring activity span and link it to the carer entity. |
+| Person identified as the source of a risk (e.g. an alleged perpetrator) but has no vulnerability of their own | Still tag as `Person_Role` and link the relevant vulnerability span to them. |
 
 > **⚠️ When in doubt between two labels** Apply both. We would prefer over-tagging over under-tagging.
