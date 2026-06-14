@@ -1,0 +1,46 @@
+Role: You are an expert data generator for a housing association NLP project. Your task is to generate realistic, synthetic housing officer notes based on a provided schema.
+
+Metadata For Simulation:
+- Note Category: {category}
+- Vulnerabilities to Include: {need_labels}
+- Person Entities to Include: {entity_labels}
+- Relation Count: {relation_count}
+- Note Length: {note_length} 
+
+INFORMATION:
+Person Entity Meanings:
+- `Person_Name`: a proper name, pseudonym, or initials e.g. "James", "Mrs Ahmed", "AR".
+- `Person_Role`: a descriptive role or relational label e.g. "tenant", "his mother", "the children", "support worker", "no. 123".
+- `Person_Pronoun`: a pronoun used as the PRIMARY reference to a person, only where no nearby name or role has been established. For example, "she" in "she has asthma" where no name or role for that person appears nearby. This only applies when the pronoun is doing the sole attributional work.
+
+Vulnerability/Need Meanings:
+{filtered_taxonomy}
+
+INSTRUCTIONS:
+1. Write a realistic, professional, but informal note from a housing officer. Length should be {note_length} words long excluding XML tags. Simulate grammatical errors such run-on sentences, mispellings, and abbreviations. Vulnerabilities and Entities can be repeated several times in the same note, according to the lists provided.
+2. Inline Tagging: Wrap target text spans in XML tags matching the schema below.
+   - For Vulnerabilities: <need label='LABEL_NAME' id='UNIQUE_8_HEX_DIGITS'>text</need>
+   - For Entities: <entity label='LABEL_NAME' id='UNIQUE_8_HEX_DIGITS'>text</entity>
+3. Relations: Map the relations using the unique IDs you generated in the XML tags. Property level labels are never linked to a person — omit them from relations.
+
+OUTPUT: 
+The data should be outputtted as a JSON object with three keys:
+- `title`: the title of the note. Should be a brief sentence.
+- `note`: your simulated note with inline tagging included.
+- `relations`: a list of JSON objects mapping the relations between vulnerabilities and persons. Relations always follow a `Vulnerability -> Entity` relationship.
+
+
+EXAMPLE SCHEMA INPUT:
+Category: tenureManagement
+Target Vulnerabilities: [housing_conditions_hoarding, property_level_disrepair_damp_mould]
+Target Entities: [Person_Role]
+Note Length: 25
+
+EXAMPLE OUTPUT:
+{
+    "title": "Welfare check and tenancy audit completed",
+    "note": "Visited the <entity label='Person_Role' id='e1234567'>tenant</entity> today. The property is severely cluttered; he is a <need label='housing_conditions_hoarding' id=\"n1111111\">hoarder with items filling the hallway</need>. Also noted <need label='property_level_disrepair_damp_mould'" id='n2222222'>heavy mould in the kitchen</need>.",
+    "relations": [
+        {"from": "n1111111", "to": "e1234567"}
+    ]
+}
