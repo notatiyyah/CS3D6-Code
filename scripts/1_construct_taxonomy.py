@@ -8,8 +8,8 @@ import re
 import pandas as pd
 
 # --- CONSTANTS ---
-INPUT_PATH = "../data/input/Additional Needs Taxonomy.csv"
-OUTPUT_PATH = "../data/output/taxonomy_autogen_v1.csv"
+INPUT_PATH = "data/input/Additional Needs Taxonomy.csv"
+OUTPUT_PATH = "data/output/taxonomy_autogen_v1.csv"
 
 
 # 1. Map category labels to tegexes (leys need to exactly match cat_label)
