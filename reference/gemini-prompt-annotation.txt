@@ -92,6 +92,7 @@ Commonly Confused Labels — read carefully:
 | Physical violence in a domestic relationship | Both `safety_risk_domestic_abuse` AND `cautions_physical_abuse_or_threat_of` |
 | "Struggling" or "not coping" alone | Do NOT apply `health_mental_health` unless mental health is clearly implied by context |
 | Tenant staying with family as incidental context | Do NOT apply `health_care_setting` — only apply if displaced due to health/vulnerability |
+| Tenant has financial issues | Do NOT apply `safety_risk_gas_capped` — only apply if 'gas cap' specifically mentioned |
 
 ---
 
