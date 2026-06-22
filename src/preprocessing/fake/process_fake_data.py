@@ -8,7 +8,7 @@ import json
 import re
 import pandas as pd
 
-from utils.utils import is_valid_json
+from src.utils.utils import is_valid_json
 
 # --- CONSTANTS ---
 INPUT_TSV_PATH = "../data/input/generated_fake_data.tsv"

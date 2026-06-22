@@ -32,12 +32,14 @@ def make_binary_label_matrix(raw_data: List[Dict[str, Any]], taxonomy_df: pd.Dat
         [need["label"] for need in record.get("needs", []) if "label" in need]
         for record in raw_data
     ]
+
+    ids = [record.get('id', '') for record in raw_data]
     
     # Encode using MultiLabelBinarizer (1 if class exists, 0 if not)
     mlb = MultiLabelBinarizer(classes=cat_labels)
     matrix = mlb.fit_transform(labels_per_record)
     
-    return pd.DataFrame(matrix, columns=mlb.classes_) # type: ignore
+    return pd.DataFrame(matrix, columns=mlb.classes_, index=ids) # type: ignore
 
 
 def compute_irl_metrics(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -64,7 +66,6 @@ def compute_irl_metrics(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def plot_label_distribution(df: pd.DataFrame, 
-                            taxonomy_df: Optional[pd.DataFrame] = None, 
                             log_scale: bool = True, 
                             figsize: Tuple[int, int] = (13, 13)) -> plt.Axes: # type: ignore
     """
@@ -74,20 +75,6 @@ def plot_label_distribution(df: pd.DataFrame,
     
     # Prepare plotting DataFrame
     plot_df = freq.reset_index(name="frequency").rename(columns={"index": "cat_label"})
-    
-    if taxonomy_df is not None:
-        # Join with taxonomy to get readable description
-        plot_df = plot_df.merge(
-            taxonomy_df[["cat_label", "category_description"]],
-            on="cat_label",
-            how="left",
-        )
-        # Use description as y-axis label, but keep cat_label for sorting
-        plot_df["display_label"] = plot_df["category_description"].fillna(plot_df["cat_label"])
-    else:
-        plot_df["display_label"] = plot_df["cat_label"]
-    
-    # Sort by frequency for descending bar chart
     plot_df["display_label"] = plot_df["cat_label"]
     
     # Plot
@@ -97,8 +84,9 @@ def plot_label_distribution(df: pd.DataFrame,
     if log_scale:
         plt.xscale("log")
     
-    # Add frequency labels on bars
-    ax.bar_label(ax.containers[0], fmt="%.0f", padding=3) # type: ignore
+    # Add frequency labels on all bars
+    for container in ax.containers:
+        ax.bar_label(container, fmt="%.0f", padding=3) # type: ignore
     
     title = f"Count of Notes by Category (n={len(df)})"
     if log_scale:
@@ -127,7 +115,7 @@ def analyze_category_distribution_from_df(df: pd.DataFrame,
     Complete analysis pipeline: take existing label matrix, compute metrics, and plot.
     """
     irlbl_df, summary_df = compute_irl_metrics(df)
-    ax = plot_label_distribution(df, taxonomy_df, log_scale)
+    ax = plot_label_distribution(df, log_scale)
     return irlbl_df, summary_df, ax
 
 

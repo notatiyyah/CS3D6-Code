@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 import uuid
 import pandas as pd
 
-from utils.utils import is_valid_json
+from src.utils.utils import is_valid_json
 
 # --- CONSTANTS ---
 PRE_ANNOTATIONS_PATH = "../data/input/gold_standard_gemini_pre_annotated.tsv"
