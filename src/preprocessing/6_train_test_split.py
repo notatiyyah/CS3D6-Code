@@ -14,7 +14,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.utils.utils import make_binary_label_matrix
+from utils.utils import make_binary_label_matrix
 
 
 # --- CONSTANTS ---
