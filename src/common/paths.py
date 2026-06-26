@@ -9,5 +9,8 @@ ANNOTATIONS = RAW / "annotations"
 
 PROCESSED = DATA / "processed"
 MODELS = DATA / "models"
+
 RESULTS = DATA / "results"
+METRICS = RESULTS / 'metrics'
+
 LOGS = DATA / "logs"

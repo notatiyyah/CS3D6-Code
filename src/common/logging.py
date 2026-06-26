@@ -1,7 +1,8 @@
 import logging
 from common.paths import LOGS
+from transformers import TrainerCallback
 
-def setup_logger(name: str, log_file_name: str) -> logging.Logger:
+def setup_logger(name: str, log_file_name: str | None = None) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
@@ -18,14 +19,29 @@ def setup_logger(name: str, log_file_name: str) -> logging.Logger:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # Log File Settings
-    log_file = LOGS / log_file_name
-    
-    # Make sure it won't fail if the dir doesn't exist
-    LOGS.mkdir(parents=True, exist_ok=True)
+    if log_file_name:
+        # Log File Settings
+        log_file = LOGS / log_file_name
+        
+        # Make sure it won't fail if the dir doesn't exist
+        LOGS.mkdir(parents=True, exist_ok=True)
 
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     return logger
+
+class FileLogCallback(TrainerCallback):
+    """Forwards Trainer's per-step/per-epoch log dicts (loss, eval f1, etc.)
+    into our own file logger, since HF's progress bar + internal logger
+    don't write to it by default."""
+    def __init__(self, logger, prefix=""):
+        self.logger = logger
+        self.prefix = prefix
+ 
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs is None:
+            return
+        entries = ", ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in logs.items())
+        self.logger.info("%sstep=%s %s", self.prefix, state.global_step, entries)
