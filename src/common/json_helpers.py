@@ -13,7 +13,7 @@ def is_valid_json(text: Any) -> bool:
     except (ValueError, TypeError):
         return False
 
-def save_json(path: Path, data, logger: logging.Logger | None = None) -> None:
+def save_json(path: Path, data, logger: logging.Logger | None = None,) -> None:
     """Save data to json & log."""
     if logger:
         logger.info("Saving data to %s...", path)

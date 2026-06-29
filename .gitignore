@@ -16,10 +16,8 @@ env/
 *.py[cod]
 *$py.class
 
-# Local data directory (ignores all data, logs, and outputs)
+# Local data (ignores all data, logs, and outputs)
 data/
 
-# Label Studio UI configuration file
-annotation/label-studio-ui.xml
-
-crap/*
+# Old retired scripts
+archive/*

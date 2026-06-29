@@ -3,7 +3,50 @@ import numpy as np
 from collections import defaultdict
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-class Evaluator:
+# IoU thresholds swept for the "in-between" matching mode. 0.0 is
+# conceptually equivalent to loose; 1.0 is conceptually equivalent to
+# strict (only exact-boundary matches have IoU=1.0).
+IOU_THRESHOLDS = (0.3, 0.5, 0.7, 0.9)
+
+
+def spans_overlap(a_start, a_end, b_start, b_end):
+    """True if spans overlap (excluding adjacency)."""
+    return max(a_start, b_start) < min(a_end, b_end)
+
+
+def compute_iou(a_start, a_end, b_start, b_end):
+    """Intersection over Union of two character ranges. 1.0 = exact match,
+    0.0 = no overlap."""
+    intersection = max(0, min(a_end, b_end) - max(a_start, b_start))
+    union = (a_end - a_start) + (b_end - b_start) - intersection
+    return intersection / union if union > 0 else 0.0
+
+
+class SpanLevelEvaluator():
+    """
+    Evaluator for span-level NER extraction (Loose, Strict, and IoU-thresholded
+    matching).
+
+    Loose: any character overlap + same label counts as a match.
+    Strict: exact boundary match (start, end) + same label.
+    IoU: a tunable middle ground (see IOU_THRESHOLDS) - requires the overlap
+    fraction (intersection/union) of predicted and gold spans to clear a
+    threshold. IoU=1.0 is equivalent to strict; very low thresholds approach
+    loose. Swept across multiple thresholds since no single cutoff is
+    obviously "correct" — different thresholds answer different questions
+    about how close the model's boundaries are to gold.
+
+    NOTE on matching order: loose/strict use first-match-wins by list order
+    (whichever true span comes first in iteration order claims a prediction).
+    IoU matching uses best-IoU-first instead (each gold span is matched to
+    its highest-IoU available prediction before moving to the next-best
+    pair) since with a real numeric overlap measure to rank by, there's no
+    reason to settle for an arbitrary first match when a better one is
+    available. This means IoU matching is a strictly more careful matching
+    procedure than loose/strict, not just a third threshold on the same
+    matching logic.
+    """
+
     def __init__(self, all_labels, logger):
         self.all_labels = sorted(list(all_labels))
         self.logger = logger
@@ -15,123 +58,23 @@ class Evaluator:
 
         return p, r, f1
 
-class DocLevelEvaluator(Evaluator):
-    """
-    Evaluator for document-level multi-label classification.
-    """
-    def __init__(self, all_labels, logger):
-        Evaluator.__init__(self, all_labels, logger)
-        self.label2id = {lbl: i for i, lbl in enumerate(self.all_labels)}
-
-    def _to_binary_matrix(self, docs_labels):
-        # TODO: Replace with utisl one?
-        """Converts a list of label lists into a binary matrix."""
-        mat = np.zeros((len(docs_labels), len(self.all_labels)), dtype=int)
-
-        for i, labels in enumerate(docs_labels):
-            for lbl in labels:
-                if lbl in self.label2id:
-                    mat[i, self.label2id[lbl]] = 1
-        return mat
-
-    def evaluate(self, y_true_lists, y_pred_lists):
-        """
-        Calculates all document-level metrics.
-        y_true_lists: List of lists containing true string labels per document.
-        y_pred_lists: List of lists containing predicted string labels per document.
-        """
-        y_true = self._to_binary_matrix(y_true_lists)
-        y_pred = self._to_binary_matrix(y_pred_lists)
-
-        metrics = {
-            "overall": {
-                "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
-                "micro_f1": float(f1_score(y_true, y_pred, average="micro", zero_division=0)),
-                "macro_precision": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
-                "macro_recall": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
-                "micro_precision": float(precision_score(y_true, y_pred, average="micro", zero_division=0)),
-                "micro_recall": float(recall_score(y_true, y_pred, average="micro", zero_division=0)),
-            },
-            "per_label": {}
-        }
-
-        for i, label in enumerate(self.all_labels):
-            tp = np.sum((y_true[:, i] == 1) & (y_pred[:, i] == 1))
-            fp = np.sum((y_true[:, i] == 0) & (y_pred[:, i] == 1))
-            fn = np.sum((y_true[:, i] == 1) & (y_pred[:, i] == 0))
-
-            p, r, f1 = self._compute_metrics(tp, fp, fn)
-
-            metrics["per_label"][label] = {
-                "precision": float(p),
-                "recall": float(r),
-                "f1": float(f1),
-                "tp": int(tp),
-                "fp": int(fp),
-                "fn": int(fn),
-            }
-
-        return metrics
-
-    def print_report(self, metrics, title="DOCUMENT-LEVEL CLASSIFICATION METRICS"):
-        """Standardized output for the evaluation results."""
-        # Title
-        self.logger.info("=" * 120)
-        self.logger.info(title)
-        self.logger.info("=" * 120)
-
-        # Header
-        self.logger.info(
-            "%-45s | %-10s | %-10s | %-10s | %-5s | %-5s | %-5s",
-            "Label",
-            "Precision",
-            "Recall",
-            "F1",
-            "TP",
-            "FP",
-            "FN"
-        )
-
-        # Sort by F1 & output table
-        for label, m in sorted(metrics["per_label"].items(),
-                               key=lambda x: x[1]["f1"],
-                               reverse=True):
-            if m["tp"] + m["fp"] + m["fn"] > 0:
-                self.logger.info(
-                    "%-45s | %-10.3f | %-10.3f | %-10.3f | %-5s | %-5s | %-5s",
-                    label,
-                    m["precision"],
-                    m["recall"],
-                    m["f1"],
-                    m["tp"],
-                    m["fp"],
-                    m["fn"],
-                )
-
-        # Show overalll metrics
-        overall = metrics["overall"]
-        self.logger.info("-" * 120)
-        self.logger.info("Macro F1: %.4f", overall["macro_f1"])
-        self.logger.info("Micro F1: %.4f", overall["micro_f1"])
-        self.logger.info("=" * 120)
-
-
-class SpanLevelEvaluator(Evaluator):
-    """
-    Evaluator for span-level ANs extraction (Loose and Strict matching).
-    """
-
     def evaluate(self, y_true_docs, y_pred_docs):
         """
         y_true_docs: List of lists. Each inner list contains (start, end, label) tuples.
         y_pred_docs: List of lists. Each inner list contains (start, end, label) tuples.
         """
-        # Initialise counters for both loose matching & strict matching
+        # Initialise counters for loose matching, strict matching, and each IoU threshold
         tp_l, fp_l, fn_l = defaultdict(int), defaultdict(int), defaultdict(int)
         tp_s, fp_s, fn_s = defaultdict(int), defaultdict(int), defaultdict(int)
+        tp_iou = {t: defaultdict(int) for t in IOU_THRESHOLDS}
+        fp_iou = {t: defaultdict(int) for t in IOU_THRESHOLDS}
+        fn_iou = {t: defaultdict(int) for t in IOU_THRESHOLDS}
 
         tot_tp_l, tot_fp_l, tot_fn_l = 0, 0, 0
         tot_tp_s, tot_fp_s, tot_fn_s = 0, 0, 0
+        tot_tp_iou = {t: 0 for t in IOU_THRESHOLDS}
+        tot_fp_iou = {t: 0 for t in IOU_THRESHOLDS}
+        tot_fn_iou = {t: 0 for t in IOU_THRESHOLDS}
 
         # Loop through predictions (per ID) & update accordingly
         for true_spans, pred_spans in zip(y_true_docs, y_pred_docs):
@@ -170,10 +113,40 @@ class SpanLevelEvaluator(Evaluator):
                 if not matched:
                     fp_s[p_label] += 1
                     tot_fp_s += 1
-            for i, (t_start, t_end, t_label) in enumerate(true_span_list):
+            for i, (t_start, t_end, t_label) in enumerate(true_spans):
                 if i not in used_true_strict:
                     fn_s[t_label] += 1
                     tot_fn_s += 1
+
+            # --- IoU Matching (per threshold), best-IoU-first ---
+            for threshold in IOU_THRESHOLDS:
+                used_true_iou, used_pred_iou = set(), set()
+                candidate_pairs = []
+                for pi, (p_start, p_end, p_label) in enumerate(pred_spans):
+                    for ti, (t_start, t_end, t_label) in enumerate(true_spans):
+                        if p_label != t_label:
+                            continue
+                        iou = compute_iou(p_start, p_end, t_start, t_end)
+                        if iou >= threshold:
+                            candidate_pairs.append((iou, ti, pi, p_label))
+
+                candidate_pairs.sort(key=lambda x: x[0], reverse=True)
+                for iou, ti, pi, label in candidate_pairs:
+                    if ti in used_true_iou or pi in used_pred_iou:
+                        continue
+                    used_true_iou.add(ti)
+                    used_pred_iou.add(pi)
+                    tp_iou[threshold][label] += 1
+                    tot_tp_iou[threshold] += 1
+
+                for pi, (p_start, p_end, p_label) in enumerate(pred_spans):
+                    if pi not in used_pred_iou:
+                        fp_iou[threshold][p_label] += 1
+                        tot_fp_iou[threshold] += 1
+                for ti, (t_start, t_end, t_label) in enumerate(true_spans):
+                    if ti not in used_true_iou:
+                        fn_iou[threshold][t_label] += 1
+                        tot_fn_iou[threshold] += 1
 
         
         # --- Calculate results per label ---
@@ -187,6 +160,15 @@ class SpanLevelEvaluator(Evaluator):
                 "loose": {"p": p_l, "r": r_l, "f1": f1_l, "tp": tp_l[label], "fp": fp_l[label], "fn": fn_l[label]},
                 "strict": {"p": p_s, "r": r_s, "f1": f1_s, "tp": tp_s[label], "fp": fp_s[label], "fn": fn_s[label]}
             }
+
+            for threshold in IOU_THRESHOLDS:
+                p_i, r_i, f1_i = self._compute_metrics(
+                    tp_iou[threshold][label], fp_iou[threshold][label], fn_iou[threshold][label]
+                )
+                results["per_label"][label][f"iou_{threshold}"] = {
+                    "p": p_i, "r": r_i, "f1": f1_i,
+                    "tp": tp_iou[threshold][label], "fp": fp_iou[threshold][label], "fn": fn_iou[threshold][label],
+                }
 
 
         # --- Calculate overall results ---
@@ -215,6 +197,18 @@ class SpanLevelEvaluator(Evaluator):
             "micro_r": micro_stats_strict[1],
             "micro_f1": micro_stats_strict[2]
         }
+
+        for threshold in IOU_THRESHOLDS:
+            iou_stats = [m[f"iou_{threshold}"] for m in results["per_label"].values()]
+            micro_stats_iou = self._compute_metrics(tot_tp_iou[threshold], tot_fp_iou[threshold], tot_fn_iou[threshold])
+            results["overall"][f"iou_{threshold}"] = {
+                "macro_p": np.mean([m["p"] for m in iou_stats]),
+                "macro_r": np.mean([m["r"] for m in iou_stats]),
+                "macro_f1": np.mean([m["f1"] for m in iou_stats]),
+                "micro_p": micro_stats_iou[0],
+                "micro_r": micro_stats_iou[1],
+                "micro_f1": micro_stats_iou[2],
+            }
         
         return results
 
@@ -226,26 +220,25 @@ class SpanLevelEvaluator(Evaluator):
         self.logger.info("=" * 120)
 
         # table header
+        iou_headers = " | ".join(f"%-15s" for _ in IOU_THRESHOLDS)
         self.logger.info(
-            "%-45s | %-15s | %-15s | %-10s",
-            "Label",
-            "Loose F1",
-            "Strict F1",
-            "Delta"
+            "%-45s | %-15s | %-15s | " + iou_headers + " | %-10s",
+            "Label", "Loose F1", "Strict F1",
+            *[f"IoU>={t} F1" for t in IOU_THRESHOLDS],
+            "Delta(S-L)",
         )
 
         # Results per label
         for label in self.all_labels:
             loose = results["per_label"][label]["loose"]
             strict = results["per_label"][label]["strict"]
+            iou_f1s = [results["per_label"][label][f"iou_{t}"]["f1"] for t in IOU_THRESHOLDS]
 
             if loose["tp"] + loose["fp"] + loose["fn"] > 0:
+                row_fmt = "%-45s | %-15.3f | %-15.3f | " + " | ".join("%-15.3f" for _ in IOU_THRESHOLDS) + " | %.3f"
                 self.logger.info(
-                    "%-45s | %-15.3f | %-15.3f | %.3f",
-                    label,
-                    loose["f1"],
-                    strict["f1"],
-                    strict["f1"] - loose["f1"]
+                    row_fmt,
+                    label, loose["f1"], strict["f1"], *iou_f1s, strict["f1"] - loose["f1"],
                 )
         
         # Overall stats
@@ -255,3 +248,8 @@ class SpanLevelEvaluator(Evaluator):
         self.logger.info("-" * 120)
         self.logger.info(f"{'Macro F1':<25} | {ov_l['macro_f1']:<25.4f} | {ov_s['macro_f1']:<25.4f} | {ov_s['macro_f1'] - ov_l['macro_f1']:.4f}")
         self.logger.info(f"{'Micro F1':<25} | {ov_l['micro_f1']:<25.4f} | {ov_s['micro_f1']:<25.4f} | {ov_s['micro_f1'] - ov_l['micro_f1']:.4f}")
+        self.logger.info("-" * 120)
+        self.logger.info("IoU-threshold macro/micro F1 (intermediate ground between loose and strict):")
+        for threshold in IOU_THRESHOLDS:
+            ov_i = results["overall"][f"iou_{threshold}"]
+            self.logger.info(f"  IoU>={threshold:<5} | macro_f1={ov_i['macro_f1']:.4f} | micro_f1={ov_i['micro_f1']:.4f}")
