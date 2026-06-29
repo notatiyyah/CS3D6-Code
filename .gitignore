@@ -11,7 +11,7 @@
 venv/
 env/
 
-# Python bytecode/cache directories (matches globally across all subfolders)
+# Python bytecode/cache directories
 **/__pycache__/
 *.py[cod]
 *$py.class
@@ -21,3 +21,10 @@ data/
 
 # Old retired scripts
 archive/*
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg

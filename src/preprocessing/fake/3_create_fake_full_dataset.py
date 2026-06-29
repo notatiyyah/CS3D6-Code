@@ -312,12 +312,12 @@ class Config:
     def __post_init__(self):
         random.seed(self.random_seed)
         fake = Faker('en')
-        Faker.seed(RANDOM_STATE)
+        Faker.seed(self.random_seed)
 
         # 50 fake names and 100 of each other sort of reference
         fake_names = [fake.name() for _ in range(50)]
         refs = ["tenant", "tnt", "l/h", "resident", "client", "cnt", "occupant", "no.4", "the gentleman", "he", "she"]
-        self.person_references = ref*100 + fake_names
+        self.person_references = refs*100 + fake_names
 
 
 def generate_note(config, row):
@@ -325,22 +325,26 @@ def generate_note(config, row):
     Note: Will likely not make sense, so this data is not used for anything other than demonstrating our sampling technique.'''
     # Words / phrases picked up by regex
     matched_cats = row[row == True].index.to_list()
-    need_spans = [random.sample(config.needs_templates[c], 1)[0] for c in matched_cats]
+    need_spans = [random.sample(config.needs_templates.get(c, [""]), 1)[0] for c in matched_cats]
 
     # create phrases containing residents
     residents = random.sample(config.person_references, random.randint(1,4))
-    resident_sentences = [random.sample(config.filler_person, 1)[0].format(r) for r in residents]
+    resident_sentences = [random.sample(config.filler_person, 1)[0] % r for r in residents]
 
     filler = random.sample(config.filler, random.randint(1,4))
 
-    note_content = ". ".join(random.shuffle(need_spans + resident_sentences + filler))
+    # combine all the sentence lists into one list & shuffle
+    combined_sentences = need_spans + resident_sentences + filler
+    random.shuffle(combined_sentences)
+    
+    # join into new note
+    note_content = " ".join(combined_sentences)
 
-    return {
-        "note_id": uuid4(), # New id for confidentiality
+    return pd.Series({
+        "note_id": uuid4(), # new ID for confidentiality
         "note_content": note_content,
         "note_category": row.note_category
-    }
-
+    })
 
 def main():
     pandarallel.initialize(progress_bar=True)
@@ -349,11 +353,11 @@ def main():
     config.logger.info("Reading regex matches from %s...", config.input_path)
     df = pd.read_csv(config.input_path)
 
-    config.logger.info("Generating %s fake notes", len(df))
+    config.logger.info("Generating %s fake notes...", len(df))
     gen_notes = df.parallel_apply(lambda x: generate_note(config, x), axis=1)
 
     config.logger.info("Saving generated notes out to %s...", config.output_path)
-    gen_notes.to_csv(config.output_path)
+    gen_notes.to_csv(config.output_path, index=False)
 
 
 if __name__ == "__main__":
