@@ -154,7 +154,7 @@ def main():
 
     # 3. Save as JSON
     config.LOGGER.info("Saving output to %s",config.OUTPUT_PATH)
-    predictions.to_json(config.OUTPUT_PATH, orient='records', indent=4)
+    predictions.to_json(config.OUTPUT_PATH, index=False, orient='records', indent=4)
 
     config.LOGGER.info("Finished successfully")
 

@@ -22,7 +22,7 @@ class Config:
 
 def export_spans_from_tagged_text(row, tag_pattern, logger):
     # Remove markdown json wrapping (gemini did this for about 100 responses) & check if valid
-    raw_json = str(row.generated_data).replace("``` json", "").replace("```", "").replace("'", "")
+    raw_json = str(row.generated_data).replace("``` json", "").replace("```", "")
     if not is_valid_json(raw_json):
         logger.error("Note %s contains invalid JSON in the generated_data column.", row.id)
         return None
@@ -44,18 +44,18 @@ def export_spans_from_tagged_text(row, tag_pattern, logger):
         offset += len(match.group(0)) - len(inner_text) # Update character offset (since removing XML tags will affect the character indexes)
 
         # Add to relevant list
-        item = {"id": tag_id, "start": start, "end": end, "label": label}
+        item = {"id": tag_id, "text": inner_text, "start": start, "end": end, "label": label}
         needs.append(item) if tag_type == "need" else persons.append(item)
 
     clean_full_text = re.sub(tag_pattern, r"\4", full_text)
 
-    return {
+    return pd.Series({
         "id": row.id,
         "text": clean_full_text,
         "needs": needs,
         "persons": persons,
         "relations": row.get("relations", []),
-    }
+    })
 
 
 def main():
@@ -72,7 +72,7 @@ def main():
     
     # 3. Export to JSON
     config.logger.info("Saving %s gemini generated records to %s", len(parsed_annotated_records), config.output_path)
-    parsed_annotated_records.to_json(config.output_path)
+    parsed_annotated_records.to_json(config.output_path, index=False, orient='records', indent=4)
 
 if __name__ == "__main__":
     main()
