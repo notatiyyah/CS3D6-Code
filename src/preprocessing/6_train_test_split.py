@@ -11,20 +11,21 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 
 from common.logging import setup_logger
 from common.paths import PROCESSED
+from common.json_helpers import load_json, save_json
 from utils.utils import make_binary_label_matrix
 
 class Config:
-    LOGGER = setup_logger("preprocessing.split_dataset", "split_dataset.log")
+    logger = setup_logger("preprocessing.split_dataset", "split_dataset.log")
 
-    INPUT_DATA_PATH = PROCESSED / "gold_standard.json"
-    TAXONOMY_PATH = PROCESSED / "taxonomy_autogen_v3.csv"
-    TRAIN_OUTPUT = PROCESSED / "train_data.json"
-    VAL_OUTPUT = PROCESSED / "val_data.json"
-    TEST_OUTPUT = PROCESSED / "test_data.json"
+    input_data_path = PROCESSED / "gold_standard.json"
+    taxonomy_path = PROCESSED / "taxonomy_autogen_v3.csv"
+    train_output = PROCESSED / "train_data.json"
+    val_output = PROCESSED / "val_data.json"
+    test_output = PROCESSED / "test_data.json"
 
-    TEST_SIZE = 0.15
-    VALIDATION_SIZE = 0.176  # (17.6% of 85% = ~15% total)
-    RANDOM_STATE = 42
+    test_size = 0.15
+    validation_size = 0.176  # (17.6% of 85% = ~15% total)
+    random_state = 42
 
 
 def group_by_text(records, labels):
@@ -47,12 +48,12 @@ def stratified_split(texts, labels):
     stratify_labels = np.column_stack([labels, no_labels])
 
     test_splitter = MultilabelStratifiedShuffleSplit(
-        n_splits=1, test_size=Config.TEST_SIZE, random_state=Config.RANDOM_STATE
+        n_splits=1, test_size=config.test_size, random_state=config.random_state
     )
     train_val_idx, test_idx = next(test_splitter.split(texts, stratify_labels))
 
     val_splitter = MultilabelStratifiedShuffleSplit(
-        n_splits=1, test_size=Config.VALIDATION_SIZE, random_state=Config.RANDOM_STATE
+        n_splits=1, test_size=config.validation_size, random_state=config.random_state
     )
     train_idx, val_idx = next(
         val_splitter.split(train_val_idx, stratify_labels[train_val_idx])
@@ -66,17 +67,14 @@ def expand(indices, texts, lookup, records):
     return [records[i] for idx in indices for i in lookup[texts[idx]]]
 
 
-def save(path, data):
-    Config.LOGGER.info("Saving %s records -> %s", len(data), path)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-
-
 def main():
-    Config.LOGGER.info("Loading data from %s and taxonomy from %s.", Config.INPUT_DATA_PATH, Config.TAXONOMY_PATH)
-    with open(Config.INPUT_DATA_PATH, encoding="utf-8") as f:
-        records = json.load(f)
-    taxonomy = pd.read_csv(Config.TAXONOMY_PATH)
+    config = Config()
+    config.logger.info("Starting train/test/validation split (70/30/30)...")
+
+    # Load data
+    json_load(config.input_data_path, config.logger)
+    config.logger.info("Loading taxonomy from %s.", config.taxonomy_path)
+    taxonomy = pd.read_csv(config.taxonomy_path)
 
     # Stratified split with duplicate records handling
     labels = make_binary_label_matrix(records, taxonomy).to_numpy()
@@ -88,23 +86,22 @@ def main():
     test = expand(test_idx, texts, lookup, records)
 
     # Save out
-    save(Config.TRAIN_OUTPUT, train)
-    save(Config.VAL_OUTPUT, val)
-    save(Config.TEST_OUTPUT, test)
-
+    save_json(config.train_output, train, config.logger)
+    save_json(config.val_output, val, config.logger)
+    save_json(config.test_output, test, config.logger)
 
     # Check for leakage
     train_texts = {x["text"] for x in train}
     val_texts = {x["text"] for x in val}
     test_texts = {x["text"] for x in test}
-    Config.LOGGER.info(
+    config.logger.info(
         "Leakage train/val=%s train/test=%s val/test=%s",
         len(train_texts & val_texts),
         len(train_texts & test_texts),
         len(val_texts & test_texts),
     )
 
-    Config.LOGGER.info("Split complete: train=%s val=%s test=%s", len(train), len(val), len(test))
+    config.logger.info("Split complete: train=%s val=%s test=%s", len(train), len(val), len(test))
 
 
 if __name__ == "__main__":

@@ -36,22 +36,23 @@ class Config:
     TEMPLATE_STRING_RELATION = "      <RELATION_PLACEHOLDER>"
 
 def main():
-    Config.LOGGER.info("Starting label studio UI generation...")
+    config = Config()
+    config.LOGGER.info("Starting label studio UI generation...")
 
     # 1. Load Template
-    Config.LOGGER.info("Loading template from %s...", Config.INPUT_TEMPLATE_PATH)
-    with open(Config.INPUT_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+    config.LOGGER.info("Loading template from %s...", config.INPUT_TEMPLATE_PATH)
+    with open(config.INPUT_TEMPLATE_PATH, "r", encoding="utf-8") as f:
         template_text = f.read()
 
     # 2. Load Taxonomy
-    Config.LOGGER.info("Loading taxonomy from %s...", Config.INPUT_TAXONOMY_PATH)
-    taxonomy = pd.read_csv(Config.INPUT_TAXONOMY_PATH)
+    config.LOGGER.info("Loading taxonomy from %s...", config.INPUT_TAXONOMY_PATH)
+    taxonomy = pd.read_csv(config.INPUT_TAXONOMY_PATH)
     category_labels_xml = []
 
     # 3. Generate HTML Label Tags for each category (grouped by high level category)
     for high_level, group in taxonomy.groupby('high_level_category'):
         category_labels_xml.append('')  # Visual break between groups
-        colour = Config.GROUP_COLOURS.get(str(high_level), Config.DEFAULT_COLOUR)
+        colour = config.GROUP_COLOURS.get(str(high_level), config.DEFAULT_COLOUR)
         
         for row in group.itertuples():
             # Parse stringified arrays (pandas doesn't do nested lists well)
@@ -78,11 +79,11 @@ def main():
 
     # 5. Inject Dynamic Elements and Save New File
     labels_string = "\n".join(category_labels_xml)
-    output_text = template_text.replace(Config.TEMPLATE_STRING_NEEDS, labels_string)
-    output_text = output_text.replace(Config.TEMPLATE_STRING_RELATION, relation_block)
+    output_text = template_text.replace(config.TEMPLATE_STRING_NEEDS, labels_string)
+    output_text = output_text.replace(config.TEMPLATE_STRING_RELATION, relation_block)
 
-    Config.LOGGER.info("Saving XML UI to %s...", Config.OUTPUT_XML_PATH)
-    with open(Config.OUTPUT_XML_PATH, "w", encoding="utf-8") as f:
+    config.LOGGER.info("Saving XML UI to %s...", config.OUTPUT_XML_PATH)
+    with open(config.OUTPUT_XML_PATH, "w", encoding="utf-8") as f:
         f.write(output_text)
 
 if __name__ == "__main__":

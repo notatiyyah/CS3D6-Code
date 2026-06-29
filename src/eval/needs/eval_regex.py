@@ -33,7 +33,7 @@ def main():
     regex_patterns = compile_regex_patterns(taxonomy)
 
     all_labels = sorted(regex_patterns.keys())
-    evaluator = SpanLevelEvaluator(all_labels, Config.logger)
+    evaluator = SpanLevelEvaluator(all_labels, config.logger)
 
     y_true, y_pred = [], []
     for record in val_records:

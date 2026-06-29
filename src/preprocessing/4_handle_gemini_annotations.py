@@ -45,7 +45,7 @@ def process_row(row) -> Dict[str, Any] | None:
 
     # Convert to JSON & handle incorrect json
     if not is_valid_json(row.gemini_predictions):
-        Config.LOGGER.warning("Invalid JSON prediction for note %s", note_id)
+        config.LOGGER.warning("Invalid JSON prediction for note %s", note_id)
         return None
     gemini_data = json.loads(str(row.gemini_predictions))
 
@@ -77,7 +77,7 @@ def process_row(row) -> Dict[str, Any] | None:
                 "end": match.end()
             })
 
-            is_person = label_name in Config.PERSON_LABELS
+            is_person = label_name in config.PERSON_LABELS
 
             results.append({
                 "id": span_id,
@@ -104,7 +104,7 @@ def process_row(row) -> Dict[str, Any] | None:
 
         # Ignore broken target relations and ignore links to self
         if not from_candidates or not to_candidates or from_key == to_key:
-            Config.LOGGER.warning(
+            config.LOGGER.warning(
                 "Could not resolve relation '%s' -> '%s' in note %s",
                 from_key,
                 to_key,
@@ -132,8 +132,8 @@ def process_row(row) -> Dict[str, Any] | None:
         },
         "predictions": [
             {
-                "model_version": Config.MODEL_VERSION,
-                "score": Config.PREDICTION_SCORE,
+                "model_version": config.MODEL_VERSION,
+                "score": config.PREDICTION_SCORE,
                 "result": results
             }
         ]
@@ -141,21 +141,22 @@ def process_row(row) -> Dict[str, Any] | None:
 
 
 def main():
-    Config.LOGGER.info("Starting Gemini annotation conversion")
+    config = Config()
+    config.LOGGER.info("Starting Gemini annotation conversion...")
     
     # 1. Load data from file
-    Config.LOGGER.info("Loading data from %s...", Config.INPUT_PATH)
-    df = pd.read_csv(Config.INPUT_PATH, sep="\t")
+    config.LOGGER.info("Loading data from %s...", config.INPUT_PATH)
+    df = pd.read_csv(config.INPUT_PATH, sep="\t")
 
     # 2. Run conversions
     predictions = df.apply(process_row, axis=1).dropna()
-    Config.LOGGER.info("Processed %s annotations", len(predictions))
+    config.LOGGER.info("Processed %s annotations", len(predictions))
 
     # 3. Save as JSON
-    Config.LOGGER.info("Saving output to %s",Config.OUTPUT_PATH)
-    predictions.to_json(Config.OUTPUT_PATH, orient='records', indent=4)
+    config.LOGGER.info("Saving output to %s",config.OUTPUT_PATH)
+    predictions.to_json(config.OUTPUT_PATH, orient='records', indent=4)
 
-    Config.LOGGER.info("Finished successfully")
+    config.LOGGER.info("Finished successfully")
 
 
 if __name__ == "__main__":
