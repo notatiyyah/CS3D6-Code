@@ -12,7 +12,7 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from common.logging import setup_logger
 from common.paths import PROCESSED
 from common.json_helpers import load_json, save_json
-from utils.utils import make_binary_label_matrix
+from common.graph_helpers import make_binary_label_matrix
 
 class Config:
     logger = setup_logger("preprocessing.split_dataset", "split_dataset.log")

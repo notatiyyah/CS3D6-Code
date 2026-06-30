@@ -1,104 +1,187 @@
-# CS3D6 — Additional Needs NER Pipeline
+# CS3D6 — Additional Needs NER & Relation Extraction Pipeline
 
-This repo contains the data preparation, annotation, and model training pipeline for a NLP project that automatically identifies **Additional Needs** (vulnerabilities and risks) in housing case notes from the London Borough of Hackney.
+This repository contains the complete data preparation, model training, and evaluation pipeline for a dissertation project investigating automatic extraction of **Additional Needs** (vulnerabilities and risks) from housing case notes provided by the London Borough of Hackney.
 
----
-
-## What it does
-
-The system performs **Named Entity Recognition (NER)** on housing case notes to:
-
-1. Identify **vulnerability/risk spans** — exact text substrings labelled with an Additional Needs category (e.g. `health_mental_health`, `safety_risk_domestic_abuse`)
-2. Identify **entity spans** — people referenced in the note (by name, role, or pronoun)
-3. Link vulnerability spans to the entity they belong to
-
-Annotations are produced in [Label Studio](https://labelstud.io/) and used to fine-tune a DistilBERT-based span extraction model.
+The pipeline identifies both the additional need described in the text and the individual to whom it refers.
 
 ---
 
-## Repo structure
+## Overview
 
-```
+The pipeline consists of three tasks:
+
+### 1. Additional Need & Person Reference Extraction
+
+The repository contains two approaches for span extraction:
+
+| Model  | Purpose                |
+| ------ | ---------------------- |
+| **Span Candidate Classifier** | Primary model. Detects both Additional Needs and person references. Because spans are predicted independently, it naturally supports overlapping annotations.                                 |
+| **BIO Token Classifier**      | Baseline sequence-labelling model. Detects Additional Needs only. BIO tagging cannot represent overlapping entities, so supporting person references would require training a separate model. |
+
+The candidate-based approach was ultimately adopted for the main pipeline because it achieved stronger performance while simultaneously extracting person references required for relation extraction.
+
+### 2. Relation Extraction
+
+Once person references and Additional Needs have been identified, a marker-based binary classifier links each need to the appropriate individual.
+
+---
+
+Then later, under the span classifier section, I'd add a short note:
+
+> **Why use the candidate-based model?**
+>
+> Unlike BIO tagging, the candidate-based classifier predicts each span independently, allowing overlapping annotations to be represented naturally. This enables a single model to detect both Additional Needs and person references. In contrast, a BIO-based pipeline would require an additional person-reference model, since overlapping entities cannot be represented within a single BIO tag sequence.
+
+And in the evaluation/baselines section, I'd briefly mention AWS Comprehend:
+
+> **Comparison with AWS Comprehend**
+>
+> AWS Comprehend Medical-style NER follows a token classification approach and similarly does not support overlapping entity annotations. As a result, person references are excluded from the Comprehend comparison, and only Additional Need extraction is evaluated.
+
+---
+
+# Performance Context
+
+A duplicate annotation study was conducted on **88** records to estimate human consistency.
+
+| Metric | Macro F1 |
+| ------ | -------- |
+| Strict | ~0.62    |
+| Loose  | ~0.78    |
+
+These values provide an approximate upper bound for expected model performance, as exact span boundaries often contain genuine ambiguity even for human annotators.
+
+---
+
+# Repository Structure
+
+The project follows a standard `src/` layout. All commands should be run from the repository root.
+
+```text
 .
-├── notebooks/
-│   ├── prep-gold-standard.ipynb        # Pulls data from Athena, applies weak labels, samples gold standard
-│   ├── generate_label_studio_ui.ipynb  # Generates the Label Studio XML config from the taxonomy CSV
-│   └── handle-gemini-annotations.ipynb # Converts Gemini pre-annotations into Label Studio format
+├── pyproject.toml
+├── requirements.txt
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   ├── logs/
+│   └── results/
 │
-├── annotation/
-│   ├── annotation_codebook.md          # Annotation guidelines for human annotators
-│   ├── gemini-prompt.txt               # Prompt used to generate Gemini pre-annotations
-│   └── label-studio-ui-template.xml   # Template for the Label Studio annotation interface
-│
-├── reference/                          # Copied from the infrastructure repo — not run here
-│   ├── additional-needs-reshape.py     # Airflow DAG script: reshapes raw notes and writes to 
-│   └── sql/
-│       └── notes-reshape.sql           # SQL query used by the reshape script
-│
-└── data/                               # Gitignored — not committed
-    ├── input/                          # Raw taxonomy CSVs and annotation exports
-    ├── output/                         # Generated taxonomy, Label Studio config, gold standard
-    └── models/                         # Fine-tuned DistilBERT model checkpoints
+└── src/
+    ├── common/
+    ├── preprocessing/
+    ├── training/
+    ├── eval/
+    └── utils/
+```
+
+The major directories are:
+
+| Directory        | Purpose                                                  |
+| ---------------- | -------------------------------------------------------- |
+| `preprocessing/` | Dataset construction and annotation processing           |
+| `training/`      | Span extraction and relation extraction training scripts |
+| `eval/`          | Evaluation scripts and metrics                           |
+| `common/`        | Shared models and utilities                              |
+| `utils/`         | Miscellaneous diagnostic scripts                         |
+
+---
+
+# Installation
+
+Create a virtual environment and install the project in editable mode.
+
+```bash
+python -m venv venv
+source venv/bin/activate
+
+pip install -e .
+```
+
+For GPU training on Linux or the Warwick cluster, install the CUDA-enabled version of PyTorch before installing the remaining dependencies:
+
+```bash
+pip install torch==2.4.1 torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
+
+pip install transformers==4.46.3 accelerate==0.34.2 \
+    scikit-learn==1.5.2 sentencepiece protobuf
 ```
 
 ---
 
-## Pipeline overview
+# Data Preparation
 
-### 0. Data reshaping (`reference/additional-needs-reshape.py` + `reference/sql/notes-reshape.sql`)
-- Runs as a scheduled **Airflow DAG** in a separate infrastructure repo — included here for reference
-- Executes `notes-reshape.sql` via AWS Athena against the raw MTFH notes and tenure tables
-- Reshapes notes (which can be targeted at a person, tenure, or asset) so each note is linked to the relevant tenure based on timestamps
-- Appends data quality flags (e.g. inactive tenancies, organisation targets, date parse failures)
-- Writes the output to S3 as Snappy-compressed Parquet and registers it in the AWS Glue Data Catalog
+The preprocessing pipeline should be executed sequentially.
 
-### 1. Data preparation (`notebooks/prep-gold-standard.ipynb`)
-- Connects to AWS Athena to pull housing case notes from the reshaped table
-- Normalises common abbreviations (e.g. `tnt` → `tenant`, `asb` → `anti-social behaviour`)
-- Applies regex-based **weak labels** to each note for each AN category
-- Performs stratified sampling to produce a balanced gold standard dataset for annotation ($n=2000$)
+| Step | Script                                        |
+| ---- | --------------------------------------------- |
+| 1    | `1_construct_taxonomy.py`                     |
+| 2    | `2_prep_gold_standard.ipynb`                  |
+| 3    | `3_generate_label_studio_ui.py` *(optional)*  |
+| 4    | `4_handle_gemini_annotations.py` *(optional)* |
+| 5    | `5_post_process_annotated_data.ipynb`         |
+| 6    | `6_train_test_split.py`                       |
+| 7    | `7_prep_data_for_comprehend.py`               |
 
-### 2. Label Studio UI generation (`notebooks/generate_label_studio_ui.ipynb`)
-- Reads the taxonomy CSV (`data/output/taxonomy_v2_autogen.csv`)
-- Generates a Label Studio XML config with colour-coded labels and value hints
-
-### 3. Gemini pre-annotation (`annotation/gemini-prompt.txt` + `notebooks/handle-gemini-annotations.ipynb`)
-- Notes are pre-annotated using the prompt in `annotation/gemini-prompt.txt` via a Gemini / Google Sheets integration (not in this repo).
-- The resulting CSV is converted into Label Studio import format by this notebook.
-
-### 4. Human annotation
-- Annotators review and correct pre-annotations in Label Studio using `annotation/annotation_codebook.md` as a guide
-
-### 5. Model training
-- Fine-tuned DistilBERT models are stored under `data/models`
+These scripts construct the taxonomy, prepare annotation datasets, process completed annotations, create train/validation/test splits, and generate comparison datasets.
 
 ---
 
-## Annotation taxonomy
+# Model Training
 
-The taxonomy covers **11 high-level categories** of Additional Needs:
+## Span Extraction
 
-- Care 
-- Caution
-- Reasonable Adjustments
-- Communication
-- Disability 
-- Health
-- Housing Conditions
-- Life Events
-- Mobility
-- Property Level
-- Safety & Risk
+The primary span extraction model is a candidate-based classifier rather than a traditional BIO tagging model.
 
-See [`annotation/annotation_codebook.md`](annotation/annotation_codebook.md) for full label definitions, value hints, and annotation rules.
+Recommended backbone:
 
-![image](annotation/label-studio-ui-screenshot.png)
+```
+microsoft/deberta-v3-base
+```
+
+## Relation Extraction
+
+Relation extraction is performed after entity detection.
+
+The model injects special entity markers around candidate entity spans before classifying whether an additional need belongs to that individual.
+
+This consistently outperformed simple heuristic approaches such as linking each need to the nearest preceding person.
 
 ---
 
-## AWS setup
+# Evaluation
 
-Data is pulled from AWS Athena. You will need:
-- An AWS profile named `data-platform-housing-prod`
-- Access to the `housing-refined-zone` database, `additional_needs_notes_reshaped` table
-- `awswrangler` and `boto3` installed
+Span Evaluation is implemented in `src/eval/metrics.py`.
+
+Three matching strategies are reported:
+
+| Metric | Description                                                                          |
+| ------ | ------------------------------------------------------------------------------------ |
+| Loose  | Any overlap between predicted and gold spans                                         |
+| Strict | Exact character boundary match                                                       |
+| IoU    | Intersection-over-Union evaluated across multiple thresholds (0.3, 0.5, 0.7 and 0.9) |
+
+This allows both boundary accuracy and approximate span localisation to be assessed.
+
+---
+
+# Running on the Warwick Batch Compute Cluster
+
+The experiments were designed to run on the University of Warwick Department of Computer Science Batch Compute Cluster.
+
+Full instructions for submitting and monitoring jobs are available in the official documentation:
+
+[https://warwick.ac.uk/fac/sci/dcs/intranet/user_guide/batch_compute/](https://warwick.ac.uk/fac/sci/dcs/intranet/user_guide/batch_compute/)
+
+## Recommended GPUs
+
+The training configuration assumes access to a GPU with **24 GB of VRAM**.
+
+Recommended partitions:
+
+* `falcon`
+* `gecko`
+
+These provide NVIDIA A10/A5000 GPUs and support the configured batch sizes. Smaller GPUs (such as `eagle`) may encounter out-of-memory errors during training.

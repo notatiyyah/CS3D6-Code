@@ -3,12 +3,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import torch
+from safetensors.torch import load_file
+from transformers import AutoTokenizer
 
 from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from common.span_model import SpanClassifier, generate_candidates, deduplicate_predictions
-from eval.metrics import SpanLevelEvaluator, spans_overlap
+from shared.span_model import SpanClassifier, generate_candidates, deduplicate_predictions
+from eval.evaluators import SpanEvaluator, spans_overlap
 
 
 @dataclass
@@ -18,11 +20,7 @@ class Config:
     max_length: int = 256
     max_candidate_size: int = 20
     thresholds: tuple = (0.5, 0.7, 0.8, 0.9)
-    # Sentencepiece tokenizers (DeBERTa, ALBERT, XLNet, etc.) absorb the
-    # preceding whitespace into a token's offset_mapping start, producing a
-    # systematic leftward shift of recovered span boundaries. Set True when
-    # base_model uses sentencepiece, to apply a post-hoc correction.
-    correct_leading_whitespace_offset: bool = False
+
 
     def __post_init__(self):
         self.model_dir = Path(self.model_dir)
@@ -36,6 +34,11 @@ class Config:
         self.logger = setup_logger(f"eval.span.{self.run_name}", f"eval_span_{self.run_name}.log")
         self.eval_path: Path = METRICS / f'span.{self.run_name}.json'
         self._get_base_model()
+
+        # Sentencepiece tokenizers (DeBERTa, ALBERT, XLNet, etc.) have a preceding 
+        # whitespace before a token, which messes up strict span calculations. 
+        # This removes it post-hoc.
+        self.correct_leading_whitespace_offset = 'deberta' in self.base_model.lower()
     
     def _get_base_model(self):
         config_path = self.run_dir / 'config.json'
@@ -93,11 +96,10 @@ def run_inference(text, model, tokenizer, label_list, config, threshold):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python eval_span.py <path/to/final_model> [--correct-offsets]")
+        print("Usage: python eval_span.py <path/to/final_model>")
         sys.exit(1)
 
-    correct_offsets = "--correct-offsets" in sys.argv
-    config = Config(model_dir=Path(sys.argv[1]), correct_leading_whitespace_offset=correct_offsets)
+    config = Config(model_dir=Path(sys.argv[1]))
     config.logger.info(
         "Evaluating spanclassifier at %s on %s (base_model=%s, correct_offsets=%s)",
         config.model_dir, config.device, config.base_model, config.correct_leading_whitespace_offset,
@@ -107,16 +109,18 @@ def main():
     label_list = load_json(config.model_dir / "label_list.json", config.logger)
 
     tokenizer_path = config.model_dir
-    from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
 
     model = SpanClassifier(config.base_model, num_labels=len(label_list)).to(config.device)
-    state_dict = torch.load(config.model_dir / "pytorch_model.bin", map_location=config.device)
+
+    model_path_safetensors = config.model_dir / "model.safetensors"
+    state_dict = load_file(model_path_safetensors, device=str(config.device))
+
     load_result = model.load_state_dict(state_dict)
     config.logger.info("Loaded model weights: %s", load_result)
     model.eval()
 
-    evaluator = SpanLevelEvaluator(label_list, config.logger)
+    evaluator = SpanEvaluator(label_list, config.logger)
     results_by_threshold = {}
 
     for threshold in config.thresholds:

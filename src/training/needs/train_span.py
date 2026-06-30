@@ -1,5 +1,5 @@
+from pathlib import Path
 import os
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # Prevents silently failing without error logs
 
 import json
 import random
@@ -10,23 +10,24 @@ import torch
 import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score
 from torch.utils.data import Dataset
-from transformers import AutoTokenizer, Trainer, TrainingArguments, TrainerCallback
+from transformers import AutoTokenizer, Trainer, TrainingArguments, EarlyStoppingCallback
+from safetensors.torch import save_file
 
 from common.paths import MODELS, PROCESSED
-from common.logging import setup_logger
+from common.logging import setup_logger, FileLogCallback
 from common.json_helpers import load_json, save_json
-from common.span_model import SpanClassifier, generate_candidates
+from shared.span_model import SpanClassifier, generate_candidates
 
 
 # --- Config ---
 @dataclass
 class TrainingConfig:
-    base_model: str = "distilbert-base-uncased"
+    base_model: str = "microsoft/deberta-v3-base"
     learning_rate: float = 2e-5
     max_steps: int = 5000
-    train_batch_size: int = 1
-    eval_batch_size: int = 1
-    gradient_accumulation_steps: int = 8
+    train_batch_size: int = 4
+    eval_batch_size: int = 4
+    gradient_accumulation_steps: int = 4
     eval_steps: int = 125
     save_steps: int = 125
     logging_steps: int = 50
@@ -40,18 +41,34 @@ class TrainingConfig:
 @dataclass
 class Config:
     run_name: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
-    train_path = PROCESSED / "train_data.json"
-    val_path = PROCESSED / "val_data.json"
+    
+    # 1. Look for SageMaker data channels, fallback to local PROCESSED dir
+    train_dir = Path(os.environ.get("SM_CHANNEL_TRAIN", PROCESSED))
+    val_dir = Path(os.environ.get("SM_CHANNEL_VAL", PROCESSED))
+    
+    train_path = train_dir / "train_data.json"
+    val_path = val_dir / "val_data.json"
 
     training: TrainingConfig = field(default_factory=TrainingConfig)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __post_init__(self):
-        self.model_dir = MODELS / "needs-span-classifier" / self.run_name
+        random.seed(self.training.seed)
+        np.random.seed(self.training.seed)
+        torch.manual_seed(self.training.seed)
+        torch.cuda.manual_seed_all(self.training.seed)
+
+        # 2. Look for SageMaker's designated output directory, fallback to local MODELS dir
+        sm_model_dir = os.environ.get("SM_MODEL_DIR")
+        if sm_model_dir:
+            self.model_dir = Path(sm_model_dir)
+        else:
+            self.model_dir = MODELS / "needs-span-classifier" / self.run_name
+            
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.logger = setup_logger(
             f"training.span.{self.run_name}",
-            f"train_span_{self.run_name}.log"
+            f"train.span_{self.run_name}.log"
         )
 
     def save_training_params(self):
@@ -146,20 +163,6 @@ class SpanTrainer(Trainer):
         return (outputs["loss"], outputs) if return_outputs else outputs["loss"]
 
 
-class FileLogCallback(TrainerCallback):
-    """Forwards Trainer's per-step/per-epoch log dicts (loss, eval f1, etc.)
-    into our own file logger, since HF's progress bar + internal logger
-    don't write to it by default."""
-    def __init__(self, logger):
-        self.logger = logger
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if logs is None:
-            return
-        entries = ", ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in logs.items())
-        self.logger.info("step=%s %s", state.global_step, entries)
-
-
 def compute_pos_weight(train_ds, num_labels, cap, device):
     pos_counts = torch.zeros(num_labels)
     total_candidates = 0
@@ -176,7 +179,7 @@ def main():
     random.seed(config.training.seed)
     torch.manual_seed(config.training.seed)
 
-    config.logger.info("Beginning training script - Span Classifier (run=%s)", config.run_name)
+    config.logger.info("Beginning training script - Span Classifier (run=%s), base model: %s", config.run_name, config.training.base_model)
     config.save_training_params()
 
     train_records = load_json(config.train_path)
@@ -196,6 +199,8 @@ def main():
     model = SpanClassifier(config.training.base_model, len(label_list), pos_weight).to(config.device)
 
     collate_fn = build_collate_fn(label_list, config.training.neg_sample_ratio, config.training.neg_sample_floor)
+
+    early_stopping = EarlyStoppingCallback(early_stopping_patience=3)
 
     args = TrainingArguments(
         output_dir=config.model_dir,
@@ -224,7 +229,7 @@ def main():
         eval_dataset=val_ds,
         data_collator=collate_fn,
         compute_metrics=compute_metrics,
-        callbacks=[FileLogCallback(config.logger)],
+        callbacks=[FileLogCallback(config.logger), early_stopping],
     )
 
     config.logger.info("Training Span Classifier on %s...", config.device)
@@ -234,7 +239,7 @@ def main():
     final_dir.mkdir(parents=True, exist_ok=True)
 
     config.logger.info("Saving Span Classifier to %s...", final_dir)
-    torch.save(model.state_dict(), final_dir / "pytorch_model.bin")
+    save_file(model.state_dict(), final_dir / "model.safetensors")
     tokenizer.save_pretrained(final_dir)
     save_json(path=final_dir / "label_list.json", data=label_list, logger=config.logger)
 

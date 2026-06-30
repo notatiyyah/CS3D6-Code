@@ -22,7 +22,7 @@ def compute_iou(a_start, a_end, b_start, b_end):
     return intersection / union if union > 0 else 0.0
 
 
-class SpanLevelEvaluator():
+class SpanEvaluator():
     """
     Evaluator for span-level NER extraction (Loose, Strict, and IoU-thresholded
     matching).
@@ -214,42 +214,35 @@ class SpanLevelEvaluator():
 
 
     def print_report(self, results, title="SPAN LEVEL METRICS"):
-        # title
-        self.logger.info("=" * 120)
+        self.logger.info("=" * 130)
         self.logger.info(title)
-        self.logger.info("=" * 120)
-
-        # table header
-        iou_headers = " | ".join(f"%-15s" for _ in IOU_THRESHOLDS)
+        self.logger.info("=" * 130)
         self.logger.info(
-            "%-45s | %-15s | %-15s | " + iou_headers + " | %-10s",
-            "Label", "Loose F1", "Strict F1",
-            *[f"IoU>={t} F1" for t in IOU_THRESHOLDS],
-            "Delta(S-L)",
+            "%-45s | %-8s %-8s %-8s | %-8s %-8s %-8s",
+            "Label", "L-P", "L-R", "L-F1", "S-P", "S-R", "S-F1"
         )
+        self.logger.info("-" * 130)
 
-        # Results per label
         for label in self.all_labels:
-            loose = results["per_label"][label]["loose"]
-            strict = results["per_label"][label]["strict"]
-            iou_f1s = [results["per_label"][label][f"iou_{t}"]["f1"] for t in IOU_THRESHOLDS]
+            l = results["per_label"][label]["loose"]
+            s = results["per_label"][label]["strict"]
+            if l["tp"] + l["fp"] + l["fn"] == 0:
+                continue
+            self.logger.info(
+                "%-45s | %-8.3f %-8.3f %-8.3f | %-8.3f %-8.3f %-8.3f",
+                label, l["p"], l["r"], l["f1"], s["p"], s["r"], s["f1"]
+            )
 
-            if loose["tp"] + loose["fp"] + loose["fn"] > 0:
-                row_fmt = "%-45s | %-15.3f | %-15.3f | " + " | ".join("%-15.3f" for _ in IOU_THRESHOLDS) + " | %.3f"
-                self.logger.info(
-                    row_fmt,
-                    label, loose["f1"], strict["f1"], *iou_f1s, strict["f1"] - loose["f1"],
-                )
-        
-        # Overall stats
-        ov_l, ov_s = results["overall"]["loose"], results["overall"]["strict"]
-        self.logger.info("-" * 120)
-        self.logger.info(f"{'Metric':<25} | {'Loose':<25} | {'Strict':<25} | {'Delta'}")
-        self.logger.info("-" * 120)
-        self.logger.info(f"{'Macro F1':<25} | {ov_l['macro_f1']:<25.4f} | {ov_s['macro_f1']:<25.4f} | {ov_s['macro_f1'] - ov_l['macro_f1']:.4f}")
-        self.logger.info(f"{'Micro F1':<25} | {ov_l['micro_f1']:<25.4f} | {ov_s['micro_f1']:<25.4f} | {ov_s['micro_f1'] - ov_l['micro_f1']:.4f}")
-        self.logger.info("-" * 120)
-        self.logger.info("IoU-threshold macro/micro F1 (intermediate ground between loose and strict):")
-        for threshold in IOU_THRESHOLDS:
-            ov_i = results["overall"][f"iou_{threshold}"]
-            self.logger.info(f"  IoU>={threshold:<5} | macro_f1={ov_i['macro_f1']:.4f} | micro_f1={ov_i['micro_f1']:.4f}")
+        self.logger.info("-" * 130)
+        ov_l = results["overall"]["loose"]
+        ov_s = results["overall"]["strict"]
+        self.logger.info(
+            "%-45s | %-8.4f %-8.4f %-8.4f | %-8.4f %-8.4f %-8.4f",
+            "MACRO", ov_l["macro_p"], ov_l["macro_r"], ov_l["macro_f1"],
+            ov_s["macro_p"], ov_s["macro_r"], ov_s["macro_f1"]
+        )
+        self.logger.info(
+            "%-45s | %-8.4f %-8.4f %-8.4f | %-8.4f %-8.4f %-8.4f",
+            "MICRO", ov_l["micro_p"], ov_l["micro_r"], ov_l["micro_f1"],
+            ov_s["micro_p"], ov_s["micro_r"], ov_s["micro_f1"]
+        )

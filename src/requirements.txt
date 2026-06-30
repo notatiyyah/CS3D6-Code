@@ -1,0 +1,11 @@
+# --- SageMaker Training Dependencies ---
+scikit-learn==1.5.2
+
+# Hugging Face ecosystem
+transformers==4.46.3
+accelerate==0.34.2
+datasets==2.18.0
+
+# DeBERTa-v3 specific requirements
+sentencepiece
+protobuf

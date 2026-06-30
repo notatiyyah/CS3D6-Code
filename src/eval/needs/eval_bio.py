@@ -4,7 +4,7 @@ BIO Token Classifier eval — span-level, via HF's NER pipeline.
 aggregation_strategy="simple" merges consecutive B-/I- tokens of the same
 entity type into a single (start, end, entity_group) span, so predictions
 land in the same exact-span format as span v3 and are scored with the same
-SpanLevelEvaluator (loose/strict) for a fair side-by-side comparison.
+SpanEvaluator (loose/strict) for a fair side-by-side comparison.
 """
 
 import sys
@@ -17,7 +17,7 @@ from transformers import pipeline, AutoTokenizer
 from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from eval.metrics import SpanLevelEvaluator
+from eval.evaluators import SpanEvaluator
 
 
 @dataclass
@@ -71,7 +71,7 @@ def main():
         "ner", model=str(config.model_dir), tokenizer=tokenizer,
         aggregation_strategy="simple", device=config.device,
     )
-    evaluator = SpanLevelEvaluator(all_labels, config.logger)
+    evaluator = SpanEvaluator(all_labels, config.logger)
 
     y_true, y_pred = [], []
     for record in val_records:
@@ -83,7 +83,7 @@ def main():
         y_pred.append([(e["start"], e["end"], e["entity_group"]) for e in entities])
 
     results = evaluator.evaluate(y_true, y_pred)
-    evaluator.print_report(results, title="DISTILBERT/ROBERTA NER METRICS")
+    evaluator.print_report(results, title="BIO-TAGGING NER METRICS")
 
     save_json(path=config.eval_path, data=results, logger=config.logger)
     config.logger.info("Eval results saved to %s", config.eval_path)

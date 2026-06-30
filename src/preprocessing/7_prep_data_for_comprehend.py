@@ -1,18 +1,25 @@
 import json
+import pandas as pd
 
 from common.json_helpers import load_json, save_json
 from common.logging import setup_logger
 from common.paths import PROCESSED
+from shared.data_utils import resolve_overlaps_longest_span
 
 class Config:
     LOGGER = setup_logger("preprocessing.format_comprehend", "preprocess.format_comprehend.log")
 
     TRAIN_DATA_PATH = PROCESSED / "train_data.json"
     VAL_DATA_PATH = PROCESSED / "val_data.json"
-    TRAIN_OUTPUT = "train_data_comprehend_{partition}.jsonl"
-    VAL_OUTPUT = "val_data_comprehend_{partition}.jsonl"
+    
+    # Define both JSONL and TXT output patterns
+    TRAIN_ANNO_OUTPUT = "train_data_comprehend_{partition}.csv"
+    VAL_ANNO_OUTPUT = "val_data_comprehend_{partition}.csv"
+    TRAIN_DOCS_OUTPUT = PROCESSED / "train_data_comprehend.txt"
+    VAL_DOCS_OUTPUT = PROCESSED / "val_data_comprehend.txt"
 
     # Split labels evenly (excluding person ref)
+    # Note: When setting up in AWS Comprehend, these must be uppercase snake case.
     MODEL_A_LABELS = {
         # overlap categories
         "safety_risk_antisocial_behaviour", 
@@ -58,119 +65,107 @@ class Config:
         "mobility_mobility_physical",
     }
 
-def resolve_overlaps_longest_span(entities):
+def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_filename, logger):
     """
-    Sorts entities to prioritize the longest span. 
-    Drops any nested/shorter entities that intersect with an already-accepted span.
+    Filters the dataset for the target model group and writes to a compliant csv annotations file (using pandas)
     """
-    if not entities:
-        return []
-        
-    # Sort by start index ascending, then by span length DESCENDING.
-    # This guarantees the longest span is evaluated and locked in first.
-    entities.sort(key=lambda x: (x["start"], -(x["end"] - x["start"])))
-    
-    resolved_entities = []
-    
-    for current_ent in entities:
-        is_overlapping = False
-        c_start, c_end = current_ent["start"], current_ent["end"]
-        
-        # Check against spans we've already accepted into the clean list
-        for accepted_ent in resolved_entities:
-            a_start, a_end = accepted_ent["BeginOffset"], accepted_ent["EndOffset"]
-            
-            # Mathematical condition for span intersection
-            if max(c_start, a_start) < min(c_end, a_end):
-                is_overlapping = True
-                break
-                
-        # If it doesn't collide with a longer span, keep it
-        if not is_overlapping:
-            resolved_entities.append({
-                "BeginOffset": c_start,
-                "EndOffset": c_end,
-                "Type": current_ent["label"].upper()  # Comprehend strictly requires uppercase types
-            })
-            
-    return resolved_entities
-
-def export_clean_comprehend_dataset(records, target_labels, output_filepath, logger):
-    """
-    Filters the dataset for the target model group and writes a compliant .jsonl file.
-    """
-    comprehend_lines = []
-    dropped_person_refs = 0
+    raw_texts = []
+    annotations_data = [] # List to hold all our row dictionaries
     
     for idx, record in enumerate(records):
-        text = record.get("text", "")
+        # 1. Flatten the text for ONE_DOC_PER_LINE (remove any newlines)
+        text = record.get("text", "").replace('\n', ' ')
+        raw_texts.append(text)
         
-        # Gather all raw entities
         raw_entities = record.get("needs", []) + record.get("persons", [])
         
-        # Filter for this specific model's labels AND strip out person_ref
         pool = []
         for ent in raw_entities:
             if ent["label"] == "person_ref":
-                dropped_person_refs += 1
+                # Skip
                 continue
             if ent["label"] in target_labels:
                 pool.append(ent)
                 
-        # Apply the Longest Span tie-breaker
         clean_entities = resolve_overlaps_longest_span(pool)
         
-        # Format to Comprehend's strict single-line JSON standard
-        comprehend_line = {
-            "File": f"doc_{idx}.txt",
-            "Line": idx,
-            "Text": text,
-            "Entities": clean_entities
-        }
-        comprehend_lines.append(comprehend_line)
+        # 2. Append a separate row for EVERY entity found in this line
+        # This solves the "multiple entities per document" requirement
+        for ent in clean_entities:
+            annotations_data.append({
+                "File": docs_filename,
+                "Line": idx,
+                "Begin Offset": ent["start"],
+                "End Offset": ent["end"],
+                "Type": ent["label"]
+            })
 
-    # Write JSONL
-    logger.info("Saving data to %s...", output_filepath)
-    with open(output_filepath, 'w', encoding='utf-8') as f:
-        for line in comprehend_lines:
-            f.write(json.dumps(line) + '\n')
+    # 3. Write Annotations CSV using pandas
+    logger.info("Saving annotations to %s...", output_csv)
+    df = pd.DataFrame(annotations_data, columns=["File", "Line", "Begin Offset", "End Offset", "Type"])
+    # index=False ensures pandas doesn't write an extra row-number column that AWS would choke on
+    df.to_csv(output_csv, index=False, encoding='utf-8')
+
+    return raw_texts
+
 
 def main():
     config = Config()
     config.LOGGER.info('Starting AWS Comprehend Data Split...')
 
-    # Load data
     raw_train = load_json(config.TRAIN_DATA_PATH, config.LOGGER)
     raw_val = load_json(config.VAL_DATA_PATH, config.LOGGER)
 
-    # Training Data
-    export_clean_comprehend_dataset(
+    # --- Training Data ---
+    # Model A
+    raw_texts = export_clean_comprehend_dataset(
         records=raw_train, 
         target_labels=config.MODEL_A_LABELS, 
-        output_filepath=PROCESSED / config.TRAIN_OUTPUT.format(partition='a'),
+        output_csv=PROCESSED / config.TRAIN_ANNO_OUTPUT.format(partition='a'),
+        docs_filename=config.TRAIN_DOCS_OUTPUT.name,
         logger=config.LOGGER
     )
+    # Model B
     export_clean_comprehend_dataset(
         records=raw_train, 
         target_labels=config.MODEL_B_LABELS, 
-        output_filepath=PROCESSED / config.TRAIN_OUTPUT.format(partition='b'),
+        output_csv=PROCESSED / config.TRAIN_ANNO_OUTPUT.format(partition='b'),
+        docs_filename=config.TRAIN_DOCS_OUTPUT.name,
+        logger=config.LOGGER
+    )
+    
+    # Write Train Documents TXT once
+    config.LOGGER.info("Saving documents to %s...", config.TRAIN_DOCS_OUTPUT)
+    with open(config.TRAIN_DOCS_OUTPUT, 'w', encoding='utf-8') as f_txt:
+        for text in raw_texts:
+            f_txt.write(text + '\n')
+
+    # --- Validation Data ---
+    # Model A
+    raw_texts = export_clean_comprehend_dataset(
+        records=raw_val, 
+        target_labels=config.MODEL_A_LABELS, 
+        output_csv=PROCESSED / config.VAL_ANNO_OUTPUT.format(partition='a'),
+        docs_filename=config.VAL_DOCS_OUTPUT.name,
+        logger=config.LOGGER
+    )
+    # Model B
+    export_clean_comprehend_dataset(
+        records=raw_val, 
+        target_labels=config.MODEL_B_LABELS, 
+        output_csv=PROCESSED / config.VAL_ANNO_OUTPUT.format(partition='b'),
+        docs_filename=config.VAL_DOCS_OUTPUT.name,
         logger=config.LOGGER
     )
 
-    # Validation Data
-    export_clean_comprehend_dataset(
-        records=raw_val, 
-        target_labels=config.MODEL_A_LABELS, 
-        output_filepath=PROCESSED / config.VAL_OUTPUT.format(partition='a'),
-        logger=config.LOGGER
-    )
-    export_clean_comprehend_dataset(
-        records=raw_val, 
-        target_labels=config.MODEL_B_LABELS, 
-        output_filepath=PROCESSED / config.VAL_OUTPUT.format(partition='b'),
-        logger=config.LOGGER
-    )
+    # Write Val Documents TXT once
+    config.LOGGER.info("Saving documents to %s...", config.VAL_DOCS_OUTPUT)
+    with open(config.VAL_DOCS_OUTPUT, 'w', encoding='utf-8') as f_txt:
+        for text in raw_texts:
+            f_txt.write(text + '\n')
+    
     config.LOGGER.info('Data Split Completed.')
+    config.LOGGER.info('LABELS: \nA: %s \nB: %s', [l.upper() for l in config.MODEL_A_LABELS], [l.upper() for l in config.MODEL_B_LABELS])
 
 if __name__ == '__main__':
     main()

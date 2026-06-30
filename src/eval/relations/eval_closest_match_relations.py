@@ -13,7 +13,7 @@ from pathlib import Path
 from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from common.relation_model import score_documents
+from shared.relation_model import score_documents
 
 
 @dataclass

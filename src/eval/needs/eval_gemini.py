@@ -8,7 +8,7 @@ from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
 
-from eval.metrics import SpanLevelEvaluator
+from eval.evaluators import SpanEvaluator
 
 
 @dataclass
@@ -41,7 +41,7 @@ def get_true_spans(record):
     start/end/label but are deliberately excluded from this eval."""
     return [
         (item["start"], item["end"], item["label"])
-        for item in record.get("needs", [])
+        for item in record.get("needs", []) + record.get("persons", [])
         if "label" in item
     ]
 
@@ -49,14 +49,22 @@ def get_true_spans(record):
 def get_predicted_spans(predictions):
     """Returns a list of (start, end, label) spans from Gemini's Label Studio
     span annotations."""
-    return [
-        (item["value"]["start"], item["value"]["end"], item["value"]["labels"][0])
-        for item in predictions
-        if item.get("type") == "labels"
-        and "labels" in item.get("value", {})
-        and "start" in item.get("value", {})
-        and "end" in item.get("value", {})
-    ]
+    results = []
+
+    for item in predictions:
+        if item.get("type") != "labels":
+            continue
+
+        label = item["value"]["labels"][0]
+        if label in ["Person_Name", "Person_Pronoun", "Person_Role"]:
+            label = "person_ref"
+        results.append((
+            item["value"]["start"],
+            item["value"]["end"],
+            label
+        ))
+
+    return results
 
 
 def main():
@@ -65,6 +73,7 @@ def main():
 
     taxonomy = pd.read_csv(config.taxonomy_path)
     all_labels = sorted(taxonomy["cat_label"].dropna().unique())
+    all_labels.append("person_ref")
 
     # Load ground truth (validation set)
     gt_records = load_json(config.gt_span_path, config.logger)
@@ -79,7 +88,7 @@ def main():
         y_true.append(get_true_spans(record))
         y_pred.append(get_predicted_spans(prediction_lookup.get(doc_id, [])))
 
-    evaluator = SpanLevelEvaluator(all_labels, config.logger)
+    evaluator = SpanEvaluator(all_labels, config.logger)
     results = evaluator.evaluate(y_true, y_pred)
 
     evaluator.print_report(
@@ -92,7 +101,6 @@ def main():
         data=results,
         logger=config.logger,
     )
-
     config.logger.info("Results saved to %s", config.eval_path)
 
 

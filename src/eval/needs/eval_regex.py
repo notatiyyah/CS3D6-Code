@@ -7,7 +7,7 @@ import pandas as pd
 from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from eval.metrics import SpanLevelEvaluator
+from eval.evaluators import SpanEvaluator
 
 
 @dataclass
@@ -18,10 +18,15 @@ class Config:
     logger = setup_logger("eval.regex_span_baseline", "eval_regex_span_baseline.log")
 
 def compile_regex_patterns(taxonomy: pd.DataFrame):
-    return {
+    regexes = {
         row["cat_label"]: re.compile(row["regex"], re.IGNORECASE)
         for _, row in taxonomy.iterrows() if pd.notna(row.get("regex"))
     }
+
+    # Copied from prep_gold_standard notebook.
+    person_regex = r"(?i)\b(tenant|tenants|leaseholder|leaseholders|resident|residents|child|children|son|daughter|partner|wife|husband|mother|father|caller|applicant|neighbour|neighbor|neighbours|neighbor|he|she|they)\b" 
+    regexes['person_ref'] = re.compile(person_regex, re.IGNORECASE)
+    return regexes
 
 
 def main():
@@ -33,12 +38,12 @@ def main():
     regex_patterns = compile_regex_patterns(taxonomy)
 
     all_labels = sorted(regex_patterns.keys())
-    evaluator = SpanLevelEvaluator(all_labels, config.logger)
+    evaluator = SpanEvaluator(all_labels, config.logger)
 
     y_true, y_pred = [], []
     for record in val_records:
         text = record.get("text", "")
-        y_true.append([(n["start"], n["end"], n["label"]) for n in record.get("needs", []) if "label" in n])
+        y_true.append([(n["start"], n["end"], n["label"]) for n in record.get("needs", []) + record.get("persons", []) if "label" in n])
 
         doc_preds = []
         for lbl, pat in regex_patterns.items():

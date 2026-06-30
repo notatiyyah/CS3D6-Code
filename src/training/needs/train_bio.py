@@ -6,8 +6,8 @@ candidate-based span classifier (span_model.py / train_span_v3.py) for the
 main pipeline, but kept and reported as a comparison architecture.
 """
 
+from pathlib import Path
 import os
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # Prevents silently failing without error logs
 
 import json
 from collections import Counter
@@ -23,55 +23,80 @@ from transformers import (
     AutoModelForTokenClassification,
     TrainingArguments,
     Trainer,
-    TrainerCallback,
     DataCollatorForTokenClassification,
+    EarlyStoppingCallback
 )
 
 from common.paths import MODELS, PROCESSED
-from common.logging import setup_logger
+from common.logging import setup_logger, FileLogCallback
 from common.json_helpers import load_json, save_json
-
+from shared.data_utils import resolve_overlaps_longest_span
 
 # --- Config ---
 @dataclass
 class TrainingConfig:
     base_model: str = "roberta-base"
     learning_rate: float = 2e-5
-    train_batch_size: int = 8
-    eval_batch_size: int = 8
-    epochs: int = 4
+    train_batch_size: int = 16
+    eval_batch_size: int = 16
+    epochs: int = 6
     weight_decay: float = 0.01
     max_length: int = 512
     logging_steps: int = 10
     o_label_weight: float = 0.1
     weight_cap: float = 5.0
     seed: int = 42
+    fp16: bool = torch.cuda.is_available()
 
 
 @dataclass
 class Config:
     run_name: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
-    train_path = PROCESSED / "train_data.json"
-    val_path = PROCESSED / "val_data.json"
+    
+    # 1. Look for SageMaker data channels, fallback to local PROCESSED dir
+    train_dir = Path(os.environ.get("SM_CHANNEL_TRAIN", PROCESSED))
+    val_dir = Path(os.environ.get("SM_CHANNEL_VAL", PROCESSED))
+    
+    train_path = train_dir / "train_data.json"
+    val_path = val_dir / "val_data.json"
 
     training: TrainingConfig = field(default_factory=TrainingConfig)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __post_init__(self):
-        self.model_dir = MODELS / "needs-bio-classifier" / self.run_name
+        # 2. Look for SageMaker's designated output directory, fallback to local MODELS dir
+        sm_model_dir = os.environ.get("SM_MODEL_DIR")
+        if sm_model_dir:
+            self.model_dir = Path(sm_model_dir)
+        else:
+            self.model_dir = MODELS / "needs-bio-classifier" / self.run_name
+            
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.logger = setup_logger(
-            f"training.bio_classifier.{self.run_name}",
-            f"train_bio_classifier_{self.run_name}.log"
+            f"training.token.{self.run_name}",
+            f"train.token_{self.run_name}.log"
         )
-
     def save_training_params(self):
         save_json(path=self.model_dir / "config.json", data=asdict(self.training), logger=self.logger)
 
 
 def load_records(path) -> list[dict]:
-    with open(path, "r", encoding="utf-8") as f:
-        return [{"text": item["text"], "entities": item.get("needs", [])} for item in json.load(f)]
+    raw = load_json(path)
+    records = []
+
+    for item in raw:
+        # Grab all entities (matching the logic in your span model)
+        raw_entities = item.get("needs", []) + item.get("persons", [])
+        
+        # Filter out the overlapping subsets to prevent BIO tag corruption
+        clean_entities = resolve_overlaps_longest_span(raw_entities)
+        
+        records.append({
+            "text": item["text"], 
+            "entities": clean_entities
+        })
+        
+    return records
 
 
 def build_label_list(train_records, val_records):
@@ -134,21 +159,6 @@ class WeightedTrainer(Trainer):
         )
         return (loss, outputs) if return_outputs else loss
 
-
-class FileLogCallback(TrainerCallback):
-    """Forwards Trainer's per-step/per-epoch log dicts (loss, eval f1, etc.)
-    into our own file logger, since HF's progress bar + internal logger
-    don't write to it by default."""
-    def __init__(self, logger):
-        self.logger = logger
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if logs is None:
-            return
-        entries = ", ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in logs.items())
-        self.logger.info("step=%s %s", state.global_step, entries)
-
-
 def build_compute_metrics_fn(label_list):
     """Token-level F1 (not seqeval-style entity-level F1): every non-masked
     (-100) token's predicted BIO tag is compared against its gold tag.
@@ -202,6 +212,8 @@ def main():
         config.training.base_model, num_labels=len(label_list), id2label=id2label, label2id=label2id
     )
 
+    early_stopping = EarlyStoppingCallback(early_stopping_patience=3)
+
     args = TrainingArguments(
         output_dir=config.model_dir,
         eval_strategy="epoch",
@@ -216,6 +228,7 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="f1_macro",
         seed=config.training.seed,
+        fp16=config.training.fp16,
     )
 
     weights = make_weights(
@@ -231,7 +244,7 @@ def main():
         data_collator=DataCollatorForTokenClassification(tokenizer),
         compute_metrics=build_compute_metrics_fn(label_list),
         loss_weights=weights,
-        callbacks=[FileLogCallback(config.logger)],
+        callbacks=[FileLogCallback(config.logger), early_stopping],
     )
 
     config.logger.info("Training BIO Classifier on %s...", config.device)

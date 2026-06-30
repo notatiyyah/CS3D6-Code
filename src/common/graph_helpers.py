@@ -9,18 +9,6 @@ import seaborn as sns
 
 from sklearn.preprocessing import MultiLabelBinarizer
 
-
-def is_valid_json(text: Any) -> bool:
-    """Safely check if a given value is valid JSON syntax."""
-    if not isinstance(text, str):
-        return False
-    try:
-        json.loads(text)
-        return True
-    except (ValueError, TypeError):
-        return False
-    
-
 def make_binary_label_matrix(raw_data: List[Dict[str, Any]], taxonomy_df: pd.DataFrame) -> pd.DataFrame:
     """
     Convert raw annotation records into a binary multi-label matrix.

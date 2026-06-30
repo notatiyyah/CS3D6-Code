@@ -15,7 +15,7 @@ import pandas as pd
 
 from common.paths import RAW, PROCESSED
 from common.logging import setup_logger
-from utils.utils import is_valid_json
+from common.json_helpers import is_valid_json
 
 
 class Config:

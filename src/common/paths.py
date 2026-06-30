@@ -12,5 +12,6 @@ MODELS = DATA / "models"
 
 RESULTS = DATA / "results"
 METRICS = RESULTS / 'metrics'
+PREDICTIONS = RESULTS / 'predictions'
 
 LOGS = DATA / "logs"
