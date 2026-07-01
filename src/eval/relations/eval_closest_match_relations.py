@@ -13,7 +13,7 @@ from pathlib import Path
 from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from shared.relation_model import score_documents
+from eval.evaluators import RelationEvaluator
 
 
 @dataclass
@@ -49,7 +49,7 @@ def main():
 
     val_records = load_json(config.val_path, config.logger)
 
-    results = score_documents(val_records, predict_fn=predict_pairs, logger=config.logger)
+    results = RelationEvaluator(config.logger).evaluate(val_records, predict_fn=predict_pairs)
 
     config.eval_dir.mkdir(parents=True, exist_ok=True)
     save_json(path=config.eval_dir / "relation_closest_match_results.json", data=results, logger=config.logger)

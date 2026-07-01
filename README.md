@@ -84,7 +84,9 @@ The major directories are:
 | `training/`      | Span extraction and relation extraction training scripts |
 | `eval/`          | Evaluation scripts and metrics                           |
 | `common/`        | Shared models and utilities                              |
-| `utils/`         | Miscellaneous diagnostic scripts                         |
+| `shared/`        | Model architecture and inference helpers shared across training, eval, and inference |
+| `inference/`     | End-to-end inference pipeline (need to run training first)   |
+| `visualizer/`    | Vite app for side-by-side comparison of ground truth and model predictions |
 
 ---
 
@@ -153,16 +155,23 @@ This consistently outperformed simple heuristic approaches such as linking each 
 
 # Evaluation
 
-Span Evaluation is implemented in `src/eval/metrics.py`.
+Span evaluation is implemented in `src/eval/evaluators.py`.
 
 Three matching strategies are reported:
 
-| Metric | Description                                                                          |
-| ------ | ------------------------------------------------------------------------------------ |
-| Loose  | Any overlap between predicted and gold spans                                         |
-| Strict | Exact character boundary match                                                       |
+| Metric | Description                                                                           |
+| ------ | ------------------------------------------------------------------------------------- |
+| Loose  | Any overlap between predicted and gold spans                                          |
+| Strict | Exact character boundary match                                                        |
 | IoU    | Intersection-over-Union evaluated across multiple thresholds (0.3, 0.5, 0.7 and 0.9) |
 
+Relation extraction is evaluated with pair-level exact match via `RelationEvaluator` in the same file.
+
+End-to-end evaluation (`src/eval/eval_e2e.py`) additionally reports:
+- Span recall — what proportion of gold spans the span classifier found
+- Relation recall given spans found — of gold relations where both spans were detected, how many were linked correctly
+
+This separates span classifier errors from relation model errors.
 This allows both boundary accuracy and approximate span localisation to be assessed.
 
 ---

@@ -10,6 +10,9 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel
 
+def spans_overlap(a_start, a_end, b_start, b_end):
+    """True if spans overlap (excluding adjacency)."""
+    return max(a_start, b_start) < min(a_end, b_end)
 
 class SpanClassifier(nn.Module):
     def __init__(self, base_model: str, num_labels: int, pos_weight=None):
@@ -42,6 +45,8 @@ def generate_candidates(offsets, max_size: int):
 def deduplicate_predictions(pred_spans, spans_overlap_fn):
     """Keep the highest-confidence prediction when spans overlap for the same label.
     pred_spans: list of (start, end, label, confidence)."""
+    from collections import defaultdict # Just in case this wasn't imported globally
+    
     by_label = defaultdict(list)
     for start, end, label, conf in pred_spans:
         by_label[label].append((start, end, conf))
@@ -53,6 +58,7 @@ def deduplicate_predictions(pred_spans, spans_overlap_fn):
         for start, end, conf in spans:
             if not any(spans_overlap_fn(start, end, k_start, k_end) for k_start, k_end, _ in kept):
                 kept.append((start, end, conf))
-        deduped.extend([(s, e, label) for s, e, _ in kept])
+        # FIX: Include the confidence 'c' in the final returned tuple
+        deduped.extend([(s, e, label, c) for s, e, c in kept])
 
     return deduped

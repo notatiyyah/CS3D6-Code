@@ -176,8 +176,6 @@ def compute_pos_weight(train_ds, num_labels, cap, device):
 
 def main():
     config = Config()
-    random.seed(config.training.seed)
-    torch.manual_seed(config.training.seed)
 
     config.logger.info("Beginning training script - Span Classifier (run=%s), base model: %s", config.run_name, config.training.base_model)
     config.save_training_params()

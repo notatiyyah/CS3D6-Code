@@ -18,7 +18,8 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from common.paths import PROCESSED, METRICS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from shared.relation_model import insert_markers, score_documents
+from shared.relation_model import insert_markers
+from eval.evaluators import RelationEvaluator
 
 
 @dataclass
@@ -54,7 +55,7 @@ def predict_pairs(doc: dict, model, tokenizer, config: Config) -> set:
         return set()
 
     predicted = set()
-    with torch.no_grad():
+    with torch.inference_mode():
         for i in range(0, len(marked_texts), config.batch_size):
             batch_texts = marked_texts[i:i + config.batch_size]
             batch_pairs = pairs[i:i + config.batch_size]
@@ -87,10 +88,9 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(config.model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(config.model_dir).to(config.device).eval()
 
-    results = score_documents(
+    results = RelationEvaluator(config.logger).evaluate(
         val_records,
         predict_fn=lambda doc: predict_pairs(doc, model, tokenizer, config),
-        logger=config.logger,
     )
 
     save_json(path=config.eval_path, data=results, logger=config.logger)

@@ -4,7 +4,7 @@ import pandas as pd
 from common.json_helpers import load_json, save_json
 from common.logging import setup_logger
 from common.paths import PROCESSED
-from shared.data_utils import resolve_overlaps_longest_span
+from common.data_utils import resolve_overlaps_longest_span
 
 class Config:
     LOGGER = setup_logger("preprocessing.format_comprehend", "preprocess.format_comprehend.log")

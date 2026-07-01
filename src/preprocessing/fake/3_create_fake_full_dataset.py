@@ -324,7 +324,7 @@ def generate_note(config, row):
     '''Takes a row from df with binary columns for regex matches and generates a fake note containing those categories. 
     Note: Will likely not make sense, so this data is not used for anything other than demonstrating our sampling technique.'''
     # Words / phrases picked up by regex
-    matched_cats = row[row == True].index.to_list()
+    matched_cats = row[row].index.to_list()
     need_spans = [random.sample(config.needs_templates.get(c, [""]), 1)[0] for c in matched_cats]
 
     # create phrases containing residents

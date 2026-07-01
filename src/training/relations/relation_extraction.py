@@ -6,10 +6,10 @@ to a specific 'person' span. Relies on upstream models to provide the entity
 boundaries. Uses entity marker injection ([N_START]/[N_END], [P_START]/[P_END])
 to guide the attention mechanism toward the spans being related.
 """
-
+from pathlib import Path
 import os
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # Prevents silently failing without error logs
 
+import random
 import json
 from collections import Counter
 from dataclasses import dataclass, asdict, field
@@ -56,18 +56,33 @@ class TrainingConfig:
 @dataclass
 class Config:
     run_name: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
-    train_path = PROCESSED / "train_data.json"
-    val_path = PROCESSED / "val_data.json"
+    # 1. Look for SageMaker data channels, fallback to local PROCESSED dir
+    train_dir = Path(os.environ.get("SM_CHANNEL_TRAIN", PROCESSED))
+    val_dir = Path(os.environ.get("SM_CHANNEL_VAL", PROCESSED))
+    
+    train_path = train_dir / "train_data.json"
+    val_path = val_dir / "val_data.json"
 
     training: TrainingConfig = field(default_factory=TrainingConfig)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __post_init__(self):
-        self.model_dir = MODELS / "needs-relation-extractor" / self.run_name
+        random.seed(self.training.seed)
+        np.random.seed(self.training.seed)
+        torch.manual_seed(self.training.seed)
+        torch.cuda.manual_seed_all(self.training.seed)
+
+        # 2. Look for SageMaker's designated output directory, fallback to local MODELS dir
+        sm_model_dir = os.environ.get("SM_MODEL_DIR")
+        if sm_model_dir:
+            self.model_dir = Path(sm_model_dir)
+        else:
+            self.model_dir = MODELS / "needs-relation-classifier" / self.run_name
+
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.logger = setup_logger(
-            f"training.relation_extraction.{self.run_name}",
-            f"train_relation_extraction_{self.run_name}.log"
+            f"training.relation.{self.run_name}",
+            f"train_relation_{self.run_name}.log"
         )
 
     def save_training_params(self):

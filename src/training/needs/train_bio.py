@@ -30,7 +30,7 @@ from transformers import (
 from common.paths import MODELS, PROCESSED
 from common.logging import setup_logger, FileLogCallback
 from common.json_helpers import load_json, save_json
-from shared.data_utils import resolve_overlaps_longest_span
+from common.data_utils import resolve_overlaps_longest_span
 
 # --- Config ---
 @dataclass
