@@ -1,0 +1,94 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f4f7f9;
+    color: #333;
+}
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.container {
+    display: flex;
+    gap: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+.column {
+    flex: 1;
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+    color: #2c3e50;
+}
+.text-box {
+    line-height: 1.6;
+    padding: 15px;
+    background: #fdfdfd;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    min-height: 150px;
+    margin-bottom: 20px;
+    color: #555;
+}
+h3 {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 10px;
+}
+.item {
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid #e1e4e8;
+    background: #fff;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+.item:hover {
+    background: #f0f7ff;
+    border-color: #a3c2f0;
+    transform: translateX(2px);
+}
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: white;
+    font-weight: bold;
+    margin-right: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Highlight Classes */
+.hl-primary { background-color: #ffeaa7; color: #000; font-weight: bold; border-radius: 2px; }
+.hl-secondary { background-color: #55efc4; color: #000; font-weight: bold; border-radius: 2px; }
+
+/* Dynamic Label Colors */
+.person_ref { background: #0984e3; }
+.care_care_setting { background: #fdcb6e; color: #2d3436; }
+.care_social_care_involvement { background: #6c5ce7; }
+.default-label { background: #b2bec3; }
+
+.score {
+    float: right;
+    color: #888;
+    font-size: 12px;
+}
+.rel-arrow {
+    color: #b2bec3;
+    margin: 0 10px;
+}

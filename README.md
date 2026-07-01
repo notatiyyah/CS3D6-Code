@@ -172,7 +172,28 @@ End-to-end evaluation (`src/eval/eval_e2e.py`) additionally reports:
 - Relation recall given spans found — of gold relations where both spans were detected, how many were linked correctly
 
 This separates span classifier errors from relation model errors.
-This allows both boundary accuracy and approximate span localisation to be assessed.
+
+---
+
+# Visualizer
+
+A Vite/React app for side-by-side comparison of ground truth and model predictions.
+
+```bash
+cd visualizer
+npm install
+npm run dev
+```
+
+Before starting, copy the data files into `visualizer/public/data/`:
+
+```
+visualizer/public/data/
+├── val_data.json                          # ground truth (or test_data.json)
+└── e2e.<span_run>_<relation_run>.json     # predictions from inference/full_e2e.py
+```
+
+The prediction filename is generated automatically by `full_e2e.py` using the run names of the two models. The app loads these two files and displays spans, labels, and relations side by side with hover highlighting.
 
 ---
 
