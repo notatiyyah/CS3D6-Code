@@ -27,7 +27,7 @@ class Config:
 
     max_length: int = 256
     max_candidate_size: int = 20
-    span_threshold: float = 0.9
+    span_threshold: float = 0.9 # Note: Update based on threshold sweep.
     relation_batch_size: int = 16
 
     def __post_init__(self):
@@ -182,7 +182,7 @@ def main():
                 "label": span[2],
                 "score": span[3],
             }
-            if span[2] == "person_ref":
+            if span[2] in ("person_name", "person_role"):
                 persons.append(item)
             else:
                 needs.append(item)

@@ -155,6 +155,24 @@ class SpanEvaluator():
         return results
 
 
+    def span_recall(self, gold_docs: list, pred_docs: list) -> dict:
+        """
+        Label-agnostic loose recall: proportion of gold spans (any label) that
+        have at least one loosely-overlapping predicted span.
+        """
+        total, found = 0, 0
+        for gold_doc, pred_doc in zip(gold_docs, pred_docs):
+            gold_spans = gold_doc.get("needs", []) + gold_doc.get("persons", [])
+            pred_spans = pred_doc.get("needs", []) + pred_doc.get("persons", [])
+            total += len(gold_spans)
+            found += sum(
+                any(self._score_loose(g["start"], g["end"], p["start"], p["end"])
+                    for p in pred_spans)
+                for g in gold_spans
+            )
+        recall = found / total if total > 0 else 0.0
+        return {"found": found, "total": total, "recall": recall}
+
     def print_report(self, results, title="SPAN LEVEL METRICS"):
         self.logger.info("=" * 80)
         self.logger.info(title)
@@ -225,15 +243,17 @@ class RelationEvaluator:
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
         return p, r, f1
 
-    def evaluate(self, val_records: list, predict_fn) -> dict:
+    def evaluate(self, val_records: list, predict_fn, gold_fn=None) -> dict:
         """
         predict_fn(doc) -> set of (need_id, person_id) pairs.
+        gold_fn(doc)   -> set of pairs (optional; defaults to _load_gold_relations).
         Returns {precision, recall, f1, tp, fp, fn}.
         """
         total_tp, total_fp, total_fn = 0, 0, 0
+        _gold_fn = gold_fn or self._load_gold_relations
 
         for doc in val_records:
-            gold = self._load_gold_relations(doc)
+            gold = {frozenset(pair) for pair in _gold_fn(doc)}
             pred = {frozenset(pair) for pair in predict_fn(doc)}
 
             tp = len(gold & pred)
@@ -249,17 +269,16 @@ class RelationEvaluator:
 
     def print_report(self, results: dict, title: str = "RELATION EXTRACTION"):
         self.logger.info(f"=== {title} ===")
-        ov = results["overall"]
         
         headers = ["Precision", "Recall", "F1", "TP", "FP", "FN"]
         # Format the overall metrics
         rows = [[
-            f"{ov['precision']:.4f}", 
-            f"{ov['recall']:.4f}", 
-            f"{ov['f1']:.4f}", 
-            ov['tp'], 
-            ov['fp'], 
-            ov['fn']
+            f"{results['precision']:.4f}", 
+            f"{results['recall']:.4f}", 
+            f"{results['f1']:.4f}", 
+            results['tp'], 
+            results['fp'], 
+            results['fn']
         ]]
         
         self.logger.info("\n" + tabulate(rows, headers=headers, tablefmt="psql", stralign="left", numalign="left"))

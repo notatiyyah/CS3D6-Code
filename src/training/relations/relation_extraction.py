@@ -38,7 +38,7 @@ from shared.relation_model import insert_markers, SPECIAL_TOKENS
 # --- Config ---
 @dataclass
 class TrainingConfig:
-    base_model: str = "roberta-base-uncased"
+    base_model: str = "roberta-base"
     learning_rate: float = 1e-5
     train_batch_size: int = 4
     eval_batch_size: int = 16

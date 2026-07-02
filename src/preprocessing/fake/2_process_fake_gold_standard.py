@@ -16,9 +16,9 @@ from common.logging import setup_logger
 # --- CONSTANTS ---
 @dataclass
 class Config:
-    logger                  = setup_logger('preprocessing.process_fake_gs', 'preprocessing.process_fake_gs')
-    gemini_output: str      = RAW / "generated_fake_data.tsv"
-    output_path: str        = PROCESSED / "generated_fake_data.json"
+    logger             = setup_logger('preprocessing.process_fake_gs', 'preprocessing.process_fake_gs')
+    gemini_output: str = RAW / "generated_fake_data.tsv"
+    output_path: str   = PROCESSED / "generated_fake_data.json"
 
 def export_spans_from_tagged_text(row, tag_pattern, logger):
     # Remove markdown json wrapping (gemini did this for about 100 responses) & check if valid
@@ -54,7 +54,7 @@ def export_spans_from_tagged_text(row, tag_pattern, logger):
         "text": clean_full_text,
         "needs": needs,
         "persons": persons,
-        "relations": row.get("relations", []),
+        "relations": gen_data['relations'],
     })
 
 
@@ -66,7 +66,7 @@ def main():
 
     # 2. Parse XML Tags and get character indexes/offsets
     # Regex for XML tags
-    tag_pattern = r"<(need|entity)\s+label=['\"]([^'\细]+)['\"]\s+id=['\"]([^'\"]+)['\"]>([\s\S]*?)</\1>"
+    tag_pattern = r"<(need|entity)\s+label=['\"]([^'\"]+)['\"]\s+id=['\"]([^'\"]+)['\"]>([\s\S]*?)<\\?/\1>"
     parsed_annotated_records = df.apply(lambda x: export_spans_from_tagged_text(
         row=x, tag_pattern=tag_pattern, logger=config.logger), axis=1)
     

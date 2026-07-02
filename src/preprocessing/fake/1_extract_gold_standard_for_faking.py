@@ -51,14 +51,19 @@ def main():
         # Get need and person labels
         persons = extract_label(r['persons'])
         needs = extract_label(r['needs'])
-        
+
+        # Give range (10 words)
+        note_length_words = len(r["text"].split())
+        lowerBound = note_length_words - (note_length_words % 10)
+        upperBound = lowerBound + 10
+
         stripped_records.append({
             "id": uuid4(),
             "category": category,
             "need_labels": needs,
             "entity_labels": persons,
             "relation_count": len(r["relations"]),
-            "note_length_words": len(r["text"].split()),
+            "note_length_range": f"{lowerBound}-{upperBound}",
         })
 
     # 3. Export

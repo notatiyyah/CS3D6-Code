@@ -83,7 +83,6 @@ def main():
     results = evaluator.evaluate(gt_records, predict_fn=make_predict_fn(prediction_lookup))
     evaluator.print_report(results, title=f"{config.model_name.upper()} RELATION EXTRACTION")
 
-    config.eval_path.parent.mkdir(parents=True, exist_ok=True)
     save_json(path=config.eval_path, data=results, logger=config.logger)
     config.logger.info("Results saved to %s", config.eval_path)
 

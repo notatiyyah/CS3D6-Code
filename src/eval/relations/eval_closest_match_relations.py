@@ -49,9 +49,10 @@ def main():
 
     val_records = load_json(config.val_path, config.logger)
 
-    results = RelationEvaluator(config.logger).evaluate(val_records, predict_fn=predict_pairs)
+    evaluator = RelationEvaluator(config.logger)
+    results = evaluator.evaluate(val_records, predict_fn=predict_pairs)
+    evaluator.print_report(results, title="CLOSEST PRECEDING MATCH RELATION EXTRACTION")
 
-    config.eval_dir.mkdir(parents=True, exist_ok=True)
     save_json(path=config.eval_dir / "relation_closest_match_results.json", data=results, logger=config.logger)
     config.logger.info("Results saved to %s", config.eval_dir / "relation_closest_match_results.json")
 

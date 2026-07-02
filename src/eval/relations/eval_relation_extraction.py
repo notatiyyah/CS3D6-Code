@@ -38,41 +38,39 @@ class Config:
         self.logger = setup_logger(f"eval.relation_extraction.{self.run_name}", f"eval_relation_extraction_{self.run_name}.log")
 
 
-def predict_pairs(doc: dict, model, tokenizer, config: Config) -> set:
-    """Run inference over every (need, person) pair in the document, return
-    the set of (need_id, person_id) pairs predicted as linked (label=1)."""
-    text = doc["text"]
-    needs = doc.get("needs", [])
-    people = doc.get("persons", [])
+def build_corpus_pairs(val_records: list) -> tuple[list, list, list]:
+    """Collect all (need, person) pairs across all documents in one pass.
 
-    pairs, marked_texts = [], []
-    for need in needs:
-        for person in people:
-            pairs.append((str(need["id"]).strip(), str(person["id"]).strip()))
-            marked_texts.append(insert_markers(text, need, person))
+    Returns:
+        all_texts:    marked text for each pair
+        all_pairs:    (need_id, person_id) for each pair
+        doc_slices:   (start, end) index into the above lists for each document
+    """
+    all_texts, all_pairs, doc_slices = [], [], []
+    for doc in val_records:
+        start = len(all_texts)
+        text = doc["text"]
+        for need in doc.get("needs", []):
+            for person in doc.get("persons", []):
+                all_pairs.append((str(need["id"]).strip(), str(person["id"]).strip()))
+                all_texts.append(insert_markers(text, need, person))
+        doc_slices.append((start, len(all_texts)))
+    return all_texts, all_pairs, doc_slices
 
-    if not marked_texts:
-        return set()
 
-    predicted = set()
+def run_batched_inference(all_texts: list, all_pairs: list, model, tokenizer, config: Config) -> list[int]:
+    """Single batched inference pass over all pairs. Returns per-pair predictions."""
+    preds = []
     with torch.inference_mode():
-        for i in range(0, len(marked_texts), config.batch_size):
-            batch_texts = marked_texts[i:i + config.batch_size]
-            batch_pairs = pairs[i:i + config.batch_size]
-
+        for i in range(0, len(all_texts), config.batch_size):
             inputs = tokenizer(
-                batch_texts, truncation=True, padding=True,
+                all_texts[i:i + config.batch_size],
+                truncation=True, padding=True,
                 max_length=config.max_length, return_tensors="pt"
             ).to(config.device)
-
             logits = model(**inputs).logits
-            preds = torch.argmax(logits, dim=1).cpu().tolist()
-
-            for (need_id, person_id), pred in zip(batch_pairs, preds):
-                if pred == 1:
-                    predicted.add((need_id, person_id))
-
-    return predicted
+            preds.extend(torch.argmax(logits, dim=1).cpu().tolist())
+    return preds
 
 
 def main():
@@ -85,14 +83,35 @@ def main():
 
     val_records = load_json(config.val_path, config.logger)
 
+    config.logger.info("Loading model...")
     tokenizer = AutoTokenizer.from_pretrained(config.model_dir)
     model = AutoModelForSequenceClassification.from_pretrained(config.model_dir).to(config.device).eval()
 
-    results = RelationEvaluator(config.logger).evaluate(
+    config.logger.info("Building pairs across %d documents...", len(val_records))
+    all_texts, all_pairs, doc_slices = build_corpus_pairs(val_records)
+    config.logger.info("Running inference over %d pairs...", len(all_texts))
+    all_preds = run_batched_inference(all_texts, all_pairs, model, tokenizer, config)
+
+    doc_index = {id(doc): idx for idx, doc in enumerate(val_records)}
+
+    config.logger.info("Evaluating...")
+
+    evaluator = RelationEvaluator(config.logger)
+
+    def predict_doc(doc):
+        start, end = doc_slices[doc_index[id(doc)]]
+        return {
+            pair
+            for pair, pred in zip(all_pairs[start:end], all_preds[start:end])
+            if pred == 1
+        }
+
+    results = evaluator.evaluate(
         val_records,
-        predict_fn=lambda doc: predict_pairs(doc, model, tokenizer, config),
+        predict_fn=predict_doc,
     )
 
+    evaluator.print_report(results, title="RELATION EXTRACTION")
     save_json(path=config.eval_path, data=results, logger=config.logger)
     config.logger.info("Eval results saved to %s", config.eval_path)
 
