@@ -39,7 +39,7 @@ class TrainingConfig:
     learning_rate: float = 2e-5
     train_batch_size: int = 16
     eval_batch_size: int = 16
-    epochs: int = 6
+    epochs: int = 10 # High for fine tuning. Will stop early if necessary.
     weight_decay: float = 0.01
     max_length: int = 512
     logging_steps: int = 10

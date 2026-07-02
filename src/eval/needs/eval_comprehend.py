@@ -72,10 +72,13 @@ def main():
         # Look up this document's predictions in Model C (persons)
         if idx in preds_per and "Entities" in preds_per[idx]:
             for ent in preds_per[idx]["Entities"]:
-                if ent["Type"] in ["PERSON", "ORGANIZATION"]:
-                    ent["Type"] = "person_ref" # match our data
-                    pred_spans.append((ent["BeginOffset"], ent["EndOffset"], ent["Type"]))
-        
+                # Map persons to person names and organisations to role (best match for generic categories)
+                if ent["Type"] == "PERSON":
+                    ent["Type"] = "person_name"
+                elif ent["Type"] == "ORGANIZATION":
+                    ent["Type"] = "person_role"
+                pred_spans.append((ent["BeginOffset"], ent["EndOffset"], ent["Type"]))
+                    
         y_pred.append(pred_spans)
 
     # 3. Run the Evaluator

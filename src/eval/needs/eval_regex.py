@@ -24,8 +24,11 @@ def compile_regex_patterns(taxonomy: pd.DataFrame):
     }
 
     # Copied from prep_gold_standard notebook.
-    person_regex = r"(?i)\b(tenant|tenants|leaseholder|leaseholders|resident|residents|child|children|son|daughter|partner|wife|husband|mother|father|caller|applicant|neighbour|neighbor|neighbours|neighbor|he|she|they)\b" 
-    regexes['person_ref'] = re.compile(person_regex, re.IGNORECASE)
+    person_role_regex = r"(?i)\b(tenant|tenants|leaseholder|leaseholders|resident|residents|child|children|son|daughter|partner|wife|husband|mother|father|caller|applicant|neighbour|neighbor|neighbours|neighbor)\b" 
+    regexes['person_role'] = re.compile(person_role_regex, re.IGNORECASE)
+    
+    person_name_regex = r"((?:[A-Z]\.\s)?[A-Z][a-z]+\s[A-Z][a-z]+)"
+    regexes['person_name'] = re.compile(person_name_regex)
     return regexes
 
 

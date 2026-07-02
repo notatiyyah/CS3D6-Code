@@ -35,7 +35,6 @@ def load_predictions(config: Config) -> Dict[str, list]:
         if record.get("data", {}).get("id") and record.get("predictions")
     }
 
-
 def get_true_spans(record):
     """Span-level ground truth uses only 'needs' — 'persons' also carry
     start/end/label but are deliberately excluded from this eval."""
@@ -45,7 +44,6 @@ def get_true_spans(record):
         if "label" in item
     ]
 
-
 def get_predicted_spans(predictions):
     """Returns a list of (start, end, label) spans from Gemini's Label Studio
     span annotations."""
@@ -54,10 +52,14 @@ def get_predicted_spans(predictions):
     for item in predictions:
         if item.get("type") != "labels":
             continue
-
         label = item["value"]["labels"][0]
-        if label in ["Person_Name", "Person_Pronoun", "Person_Role"]:
-            label = "person_ref"
+
+        # Clean person labels
+        if label == "Person_Pronoun":
+            continue # Skip
+        if label in ["Person_Name", "Person_Role"]:
+            label = label.lower()
+        
         results.append((
             item["value"]["start"],
             item["value"]["end"],

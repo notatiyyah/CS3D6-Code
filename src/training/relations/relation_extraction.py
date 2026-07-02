@@ -1,5 +1,5 @@
 """
-Distilbert Relation Extraction — Needs to Person.
+RoBERTa Relation Extraction — Needs to Person.
 
 Binary sequence classification to determine if a specific 'need' span applies
 to a specific 'person' span. Relies on upstream models to provide the entity
@@ -30,7 +30,7 @@ from transformers import (
 )
 
 from common.paths import MODELS, PROCESSED
-from common.logging import setup_logger
+from common.logging import setup_logger, FileLogCallback
 from common.json_helpers import save_json
 from shared.relation_model import insert_markers, SPECIAL_TOKENS
 
@@ -38,7 +38,7 @@ from shared.relation_model import insert_markers, SPECIAL_TOKENS
 # --- Config ---
 @dataclass
 class TrainingConfig:
-    base_model: str = "distilbert-base-uncased"
+    base_model: str = "roberta-base-uncased"
     learning_rate: float = 1e-5
     train_batch_size: int = 4
     eval_batch_size: int = 16
@@ -92,8 +92,7 @@ class Config:
 def build_re_dataset(path, logger) -> list[dict]:
     """Build every (need, person) pair per document, labeling each pair 1 if
     a relation links them, 0 otherwise. IDs are cast to stripped strings for
-    exact matching; both (from, to) and (to, from) are treated as linked to
-    guard against inverted relation direction in the source annotations."""
+    exact matching."""
     with open(path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
@@ -107,13 +106,15 @@ def build_re_dataset(path, logger) -> list[dict]:
         for rel in doc.get("relations", []):
             rel_from = str(rel["from"]).strip()
             rel_to = str(rel["to"]).strip()
+            
             valid_relations.add((rel_from, rel_to))
-            valid_relations.add((rel_to, rel_from))
 
         for need in needs:
             for person in people:
                 need_id = str(need["id"]).strip()
                 person_id = str(person["id"]).strip()
+                
+                # Strictly require Need -> Person
                 is_linked = 1 if (need_id, person_id) in valid_relations else 0
                 marked_text = insert_markers(text, need, person)
 
@@ -155,20 +156,6 @@ class WeightedRETrainer(Trainer):
         loss_fct = torch.nn.CrossEntropyLoss(weight=self.loss_weights)
         loss = loss_fct(outputs.logits.view(-1, 2), labels.view(-1))
         return (loss, outputs) if return_outputs else loss
-
-
-class FileLogCallback(TrainerCallback):
-    """Forwards Trainer's per-step/per-epoch log dicts (loss, eval f1, etc.)
-    into our own file logger, since HF's progress bar + internal logger
-    don't write to it by default."""
-    def __init__(self, logger):
-        self.logger = logger
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if logs is None:
-            return
-        entries = ", ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in logs.items())
-        self.logger.info("step=%s %s", state.global_step, entries)
 
 
 def compute_metrics(eval_pred):

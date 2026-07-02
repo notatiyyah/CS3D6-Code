@@ -37,7 +37,7 @@ class ResultSource:
 
 @dataclass
 class Config:
-    mode: str = "iou_0.7" # "loose", "strict" or "iou_0.5" etc
+    mode: str # Eval mode - Loose, strict, iou_0.3, iou_0.5, iou_0.7, iou_0.9,
 
     logger = setup_logger("eval.compare_models", "compare_models.log")
     overall_metrics = ["macro_f1", "micro_f1", "macro_p", "macro_r", "micro_p", "micro_r"]
@@ -50,6 +50,8 @@ class Config:
         ResultSource("regex", METRICS / "span_regex.json"),
     ]
 
+    def __post_init__(self):
+        self.mode = str(self.mode).strip()
 
 def load_results_set(source: ResultSource, logger: Logger, mode: str) -> dict:
     data = load_json(source.file, logger)
@@ -91,7 +93,11 @@ def load_results_set(source: ResultSource, logger: Logger, mode: str) -> dict:
     return {"overall": overall, "per_label": per_label_raw}
 
 def main():
-    config = Config()
+    if len(sys.argv) < 2:
+        print("Usage: python compare_model_metrics.py <mode>")
+        sys.exit(1)
+
+    config = Config(mode=Path(sys.argv[1]))
     data = {}
     for source in config.result_sources:
         try:

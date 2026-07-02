@@ -41,7 +41,7 @@ def group_by_text(records, labels):
     return texts, grouped_labels, text_to_indices
 
 
-def stratified_split(texts, labels):
+def stratified_split(texts, labels, config):
     """Two-stage multilabel stratified split into train/val/test, with an
     extra column so all-zero-label rows still stratify correctly."""
     no_labels = (labels.sum(axis=1) == 0).astype(int)
@@ -72,14 +72,14 @@ def main():
     config.logger.info("Starting train/test/validation split (70/30/30)...")
 
     # Load data
-    json_load(config.input_data_path, config.logger)
+    records = load_json(config.input_data_path, config.logger)
     config.logger.info("Loading taxonomy from %s.", config.taxonomy_path)
     taxonomy = pd.read_csv(config.taxonomy_path)
 
     # Stratified split with duplicate records handling
     labels = make_binary_label_matrix(records, taxonomy).to_numpy()
     texts, grouped_labels, lookup = group_by_text(records, labels)
-    train_idx, val_idx, test_idx = stratified_split(texts, grouped_labels)
+    train_idx, val_idx, test_idx = stratified_split(texts, grouped_labels, config)
 
     train = expand(train_idx, texts, lookup, records)
     val = expand(val_idx, texts, lookup, records)

@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 @dataclass
 class Config:
-    job_name: str                  = "e2e-inference-pipeline"
     # AWS Config
     is_local: bool                 = False
     aws_profile_name: str          = "data-platform-dev-admin"
@@ -63,7 +62,7 @@ def main():
         instance_count=1,
         instance_type='local' if config.is_local else 'ml.g5.xlarge',
         tags=config.tags,
-        output_path= config.s3_output_predictions_uri,
+        output_path= config.s3_output_path,
     )
 
     # Kick off the job
@@ -73,7 +72,7 @@ def main():
         "span_model": config.s3_span_model_uri,
         "relation_model": config.s3_relation_model_uri
     }
-    estimator.fit(inputs=inputs, job_name=config.job_name)
+    estimator.fit(inputs=inputs)
 
 if __name__ == "__main__":
     main()
