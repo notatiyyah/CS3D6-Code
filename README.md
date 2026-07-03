@@ -185,7 +185,7 @@ Output is written to `data/results/predictions/e2e.<span_run>_<relation_run>.jso
 Resolves predicted person references to household member IDs and produces a flat CSV for database import.
 
 ```bash
-python src/inference/match_needs_to_tenants.py data/processed/val_data_with_households.json
+python src/inference/match_needs_to_tenants.py data/processed/val_data.json
 ```
 
 Output is written to `data/results/predictions/entity_linking_<input_stem>.csv`.
@@ -224,15 +224,18 @@ npm install
 npm run dev
 ```
 
-Before starting, copy the data files into `visualizer/public/data/`:
+Before starting, copy the data files into `visualizer/public/data/` and set the filenames in `visualizer/src/config.js`:
 
-```
-visualizer/public/data/
-├── val_data.json                          # ground truth (or test_data.json)
-└── e2e.<span_run>_<relation_run>.json     # predictions from inference/full_e2e.py
+```js
+// visualizer/src/config.js
+const config = {
+  groundTruthFile: "val_data.json",                              // ground truth or test data
+  predictionsFile: "e2e.span_model_relation_model.json",         // output of inference/full_e2e.py
+  entityLinkingFile: "entity_linking_val_data_with_households.csv", // output of inference/match_needs_to_tenants.py
+};
 ```
 
-The prediction filename is generated automatically by `full_e2e.py` using the run names of the two models. The app loads these two files and displays spans, labels, and relations side by side with hover highlighting.
+The app displays spans, labels, relations, and entity linking assignments side by side with hover highlighting.
 
 ---
 

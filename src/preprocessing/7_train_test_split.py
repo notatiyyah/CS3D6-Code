@@ -17,7 +17,7 @@ from common.graph_helpers import make_binary_label_matrix
 class Config:
     logger = setup_logger("preprocessing.split_dataset", "split_dataset.log")
 
-    input_data_path = PROCESSED / "gold_standard.json"
+    input_data_path = PROCESSED / "gold_standard_with_households.json"
     taxonomy_path = PROCESSED / "taxonomy_autogen_v3.csv"
     train_output = PROCESSED / "train_data.json"
     val_output = PROCESSED / "val_data.json"

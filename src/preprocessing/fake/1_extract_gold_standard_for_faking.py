@@ -18,7 +18,7 @@ from common.logging import setup_logger
 @dataclass
 class Config:
     logger                  = setup_logger('preprocessing.extract_gs_for_faking', 'preprocessing.extract_gs_for_faking')
-    gold_standard_path: str = PROCESSED / "gold_standard.json"
+    gold_standard_path: str = PROCESSED / "gold_standard_with_households.json"
     taxonomy_path: str      = PROCESSED / "taxonomy_autogen_v3.csv"
     output_path: str        = PROCESSED / "stripped_annotated_data.csv"
 
@@ -30,6 +30,33 @@ def extract_label(label_list):
         }
         for l in label_list
     ]
+
+def extract_household_members(record, logger):
+    if record.get('household_members') is None:
+        logger.warning("NoneType household_members in record %s.", record.get('id', 'unknown'))
+        return []
+    
+    # Try parse json
+    if isinstance(record['household_members'], str):
+        try:
+            raw_members = json.loads(record['household_members'])
+        except:
+            logger.warning("Invalid household_members in record %s", record.get('id', 'unknown'))
+            return []
+    else:
+        raw_members = record['household_members']
+
+    # Parse fields without PII
+    household_members = []
+    for person in raw_members:
+        household_members.append({
+            "id": person['id'],
+            "type": person['type'],
+            "isResponsible": person['isResponsible'],
+            "dateOfBirth": person['dateOfBirth'], # Already stripped in golden standard so not PII
+            "personTenureType": person['personTenureType'],
+        })
+    return household_members
 
 def main():
     config = Config()
@@ -64,6 +91,7 @@ def main():
             "entity_labels": persons,
             "relation_count": len(r["relations"]),
             "note_length_range": f"{lowerBound}-{upperBound}",
+            "household_roster": extract_household_members(r, config.logger),
         })
 
     # 3. Export

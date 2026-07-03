@@ -15,8 +15,6 @@ Copy your data files into `public/data/` before starting:
 
 ```
 public/data/
-├── val_data.json                        # ground truth (val or test)
-└── e2e.<span_run>_<relation_run>.json   # predictions from inference/full_e2e.py
-```
-
-The prediction filename is generated automatically by `full_e2e.py` from the run names of the two models. These files are not committed — `public/data/` is gitignored.
+├── val_data.json                                  # ground truth (val or test)
+└── e2e.<span_run>_<relation_run>.json             # predictions from inference
+└── entity linking.<span_run>_<relation_run>.csv   # household attributions (post-processing)
