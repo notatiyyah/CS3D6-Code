@@ -1,5 +1,5 @@
 """
-RoBERTa Relation Extraction — Needs to Person.
+ALBERT Relation Extraction — Needs to Person.
 
 Binary sequence classification to determine if a specific 'need' span applies
 to a specific 'person' span. Relies on upstream models to provide the entity
@@ -38,7 +38,7 @@ from shared.relation_model import insert_markers, SPECIAL_TOKENS
 # --- Config ---
 @dataclass
 class TrainingConfig:
-    base_model: str = "roberta-base"
+    base_model: str = "albert-base-v2"
     learning_rate: float = 1e-5
     train_batch_size: int = 4
     eval_batch_size: int = 16
@@ -64,7 +64,11 @@ class Config:
     val_path = val_dir / "val_data.json"
 
     training: TrainingConfig = field(default_factory=TrainingConfig)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.device("cuda") if torch.cuda.is_available()
+        else torch.device("mps") if torch.backends.mps.is_available()
+        else torch.device("cpu")
+    )
 
     def __post_init__(self):
         random.seed(self.training.seed)

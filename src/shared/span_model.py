@@ -19,7 +19,7 @@ class SpanClassifier(nn.Module):
         super().__init__()
         self.backbone = AutoModel.from_pretrained(base_model)
         self.classifier = nn.Linear(self.backbone.config.hidden_size * 2, num_labels)
-        self.pos_weight = pos_weight  # plain attribute, not a buffer — see train_span_v3.py note
+        self.pos_weight = pos_weight
 
     def forward(self, input_ids, attention_mask, candidate_spans, labels=None):
         hidden_states = self.backbone(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[0]

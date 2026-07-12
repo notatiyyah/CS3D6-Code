@@ -1,5 +1,7 @@
 # --- SageMaker Training Dependencies ---
 scikit-learn==1.5.2
+evaluate
+seqeval
 
 # Hugging Face ecosystem
 transformers==4.46.3

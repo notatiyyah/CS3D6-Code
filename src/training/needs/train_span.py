@@ -22,21 +22,23 @@ from shared.span_model import SpanClassifier, generate_candidates
 # --- Config ---
 @dataclass
 class TrainingConfig:
-    base_model: str = "microsoft/deberta-v3-base"
-    learning_rate: float = 2e-5
-    max_steps: int = 5000
-    train_batch_size: int = 4
-    eval_batch_size: int = 4
-    gradient_accumulation_steps: int = 4
-    eval_steps: int = 125
-    save_steps: int = 125
-    logging_steps: int = 50
-    max_candidate_size: int = 20
-    neg_sample_ratio: int = 5
-    neg_sample_floor: int = 50
-    pos_weight_cap: float = 5.0
-    seed: int = 42
-    fp16: bool = torch.cuda.is_available()
+    base_model: str                  = "microsoft/deberta-v3-base"
+    max_length: int                  = 256
+    learning_rate: float             = 2e-5
+    max_steps: int                   = 5000
+    train_batch_size: int            = 1 # DO NOT CHANGE
+    eval_batch_size: int             = 1 # DO NOT CHANGE
+    gradient_accumulation_steps: int = 8
+    eval_steps: int                  = 200
+    save_steps: int                  = 200
+    logging_steps: int               = 100
+    early_stopping_patience: int     = 5
+    max_candidate_size: int          = 10
+    neg_sample_ratio: int            = 5
+    neg_sample_floor: int            = 50
+    pos_weight_cap: float            = 5.0
+    seed: int                        = 42
+    fp16: bool                       = torch.cuda.is_available()
 
 @dataclass
 class Config:
@@ -76,10 +78,10 @@ class Config:
 
 
 class SpanDataset(Dataset):
-    def __init__(self, records, tokenizer, label2id, max_candidate_size):
+    def __init__(self, records, tokenizer, label2id, max_candidate_size, max_length):
         self.examples = []
         for record in records:
-            tokenized = tokenizer(record["text"], truncation=True, max_length=512, return_offsets_mapping=True)
+            tokenized = tokenizer(record["text"], truncation=True, max_length=max_length, return_offsets_mapping=True)
             offsets = tokenized["offset_mapping"]
             gold_token_spans = {}
             all_entities = record.get("needs", []) + record.get("persons", [])
@@ -190,33 +192,36 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(config.training.base_model)
 
-    train_ds = SpanDataset(train_records, tokenizer, label2id, config.training.max_candidate_size)
-    val_ds = SpanDataset(val_records, tokenizer, label2id, config.training.max_candidate_size)
+    train_ds = SpanDataset(train_records, tokenizer, label2id, config.training.max_candidate_size, config.training.max_length)
+    val_ds = SpanDataset(val_records, tokenizer, label2id, config.training.max_candidate_size, config.training.max_length)
 
     pos_weight = compute_pos_weight(train_ds, len(label_list), config.training.pos_weight_cap, config.device)
     model = SpanClassifier(config.training.base_model, len(label_list), pos_weight).to(config.device)
 
     collate_fn = build_collate_fn(label_list, config.training.neg_sample_ratio, config.training.neg_sample_floor)
 
-    early_stopping = EarlyStoppingCallback(early_stopping_patience=3)
-
     args = TrainingArguments(
         output_dir=config.model_dir,
+        seed=config.training.seed,
+
         eval_strategy="steps",
         eval_steps=config.training.eval_steps,
         save_strategy="steps",
         save_steps=config.training.save_steps,
         max_steps=config.training.max_steps,
+        logging_steps=config.training.logging_steps,
+        remove_unused_columns=False,
+
         save_total_limit=1,
+
         learning_rate=config.training.learning_rate,
         per_device_train_batch_size=config.training.train_batch_size,
         per_device_eval_batch_size=config.training.eval_batch_size,
         gradient_accumulation_steps=config.training.gradient_accumulation_steps,
-        logging_steps=config.training.logging_steps,
-        remove_unused_columns=False,
+        
         load_best_model_at_end=True,
         metric_for_best_model="f1_macro",
-        seed=config.training.seed,
+
         fp16=config.training.fp16,
     )
 
@@ -227,7 +232,10 @@ def main():
         eval_dataset=val_ds,
         data_collator=collate_fn,
         compute_metrics=compute_metrics,
-        callbacks=[FileLogCallback(config.logger), early_stopping],
+        callbacks=[
+            FileLogCallback(config.logger), 
+            EarlyStoppingCallback(early_stopping_patience=config.training.early_stopping_patience)
+        ],
     )
 
     config.logger.info("Training Span Classifier on %s...", config.device)
