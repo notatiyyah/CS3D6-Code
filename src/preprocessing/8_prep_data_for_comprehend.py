@@ -18,7 +18,7 @@ class Config:
     TRAIN_DOCS_OUTPUT = PROCESSED / "train_data_comprehend.txt"
     VAL_DOCS_OUTPUT = PROCESSED / "val_data_comprehend.txt"
 
-    # Split labels evenly (excluding person ref)
+    # Split labels evenly
     # Note: When setting up in AWS Comprehend, these must be uppercase snake case.
     MODEL_A_LABELS = {
         # overlap categories
@@ -65,6 +65,12 @@ class Config:
         "mobility_mobility_physical",
     }
 
+    # just person references
+    MODEL_C_LABELS = {
+        "person_role",
+        "person_name",
+    }
+
 def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_filename, logger):
     """
     Filters the dataset for the target model group and writes to a compliant csv annotations file (using pandas)
@@ -81,9 +87,6 @@ def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_fil
         
         pool = []
         for ent in raw_entities:
-            if ent["label"] == "person_ref":
-                # Skip
-                continue
             if ent["label"] in target_labels:
                 pool.append(ent)
                 
@@ -97,13 +100,12 @@ def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_fil
                 "Line": idx,
                 "Begin Offset": ent["start"],
                 "End Offset": ent["end"],
-                "Type": ent["label"]
+                "Type": ent["label"].upper() # Uppercase for comprehend
             })
 
     # 3. Write Annotations CSV using pandas
     logger.info("Saving annotations to %s...", output_csv)
     df = pd.DataFrame(annotations_data, columns=["File", "Line", "Begin Offset", "End Offset", "Type"])
-    # index=False ensures pandas doesn't write an extra row-number column that AWS would choke on
     df.to_csv(output_csv, index=False, encoding='utf-8')
 
     return raw_texts
@@ -133,6 +135,14 @@ def main():
         docs_filename=config.TRAIN_DOCS_OUTPUT.name,
         logger=config.LOGGER
     )
+    # Model c
+    export_clean_comprehend_dataset(
+        records=raw_train, 
+        target_labels=config.MODEL_C_LABELS, 
+        output_csv=PROCESSED / config.TRAIN_ANNO_OUTPUT.format(partition='c'),
+        docs_filename=config.TRAIN_DOCS_OUTPUT.name,
+        logger=config.LOGGER
+    )
     
     # Write Train Documents TXT once
     config.LOGGER.info("Saving documents to %s...", config.TRAIN_DOCS_OUTPUT)
@@ -157,6 +167,14 @@ def main():
         docs_filename=config.VAL_DOCS_OUTPUT.name,
         logger=config.LOGGER
     )
+    # Model C
+    export_clean_comprehend_dataset(
+        records=raw_val, 
+        target_labels=config.MODEL_C_LABELS, 
+        output_csv=PROCESSED / config.VAL_ANNO_OUTPUT.format(partition='c'),
+        docs_filename=config.VAL_DOCS_OUTPUT.name,
+        logger=config.LOGGER
+    )
 
     # Write Val Documents TXT once
     config.LOGGER.info("Saving documents to %s...", config.VAL_DOCS_OUTPUT)
@@ -165,7 +183,7 @@ def main():
             f_txt.write(text + '\n')
     
     config.LOGGER.info('Data Split Completed.')
-    config.LOGGER.info('LABELS: \nA: %s \nB: %s', [l.upper() for l in config.MODEL_A_LABELS], [l.upper() for l in config.MODEL_B_LABELS])
+    config.LOGGER.info('LABELS: \nA: %s \nB: %s \nC: %s', [l.upper() for l in config.MODEL_A_LABELS], [l.upper() for l in config.MODEL_B_LABELS], [l.upper() for l in config.MODEL_C_LABELS])
 
 if __name__ == '__main__':
     main()

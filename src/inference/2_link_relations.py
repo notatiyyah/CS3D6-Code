@@ -93,12 +93,8 @@ def main():
     for doc in tqdm(records):
         doc["relations"] = predict_relations(doc, model, tokenizer, cfg.device, cfg.max_length, cfg.batch_size)
 
-    # Save out (safely)
-    out_name = cfg.input_file.name.replace("spans_", f"e2e_predictions_{cfg.run_name}_")
-    if not out_name.startswith("e2e_predictions_"):
-        out_name = f"e2e_predictions_{cfg.run_name}_{cfg.input_file.name}"
-         
-    save_json(cfg.output_dir / out_name, records)
+    out_name = f"relations_{cfg.run_name}_{cfg.input_file.name}"
+    save_json(cfg.output_dir / out_name, records, cfg.logger)
 
 if __name__ == "__main__":
     main()

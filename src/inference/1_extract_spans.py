@@ -61,7 +61,7 @@ def run_inference(text, model, tokenizer, label_list, config):
         truncation=True, 
         max_length=config.max_length, 
         return_offsets_mapping=True,
-        return_tensors="pt" 
+        return_tensors="pt"
     )
     
     offsets = tokenized["offset_mapping"][0].tolist()
@@ -72,11 +72,11 @@ def run_inference(text, model, tokenizer, label_list, config):
 
     input_ids = tokenized["input_ids"].to(config.device)
     attention_mask = tokenized["attention_mask"].to(config.device)
-    
     candidate_spans = torch.tensor(candidates, dtype=torch.long, device=config.device)
 
     outputs = model(input_ids, attention_mask, candidate_spans)
-    probs = torch.sigmoid(outputs["logits"]).cpu().numpy()
+    # probs shape: [n_candidates, num_labels + 1], last column is background
+    probs = torch.softmax(outputs["logits"], dim=-1).cpu().numpy()
 
     char_spans = []
     for tok_start, tok_end in candidates:
@@ -92,24 +92,30 @@ def run_inference(text, model, tokenizer, label_list, config):
 
 
 def apply_threshold(char_spans, probs, label_list, threshold):
+    """threshold gates whether we trust the argmax prediction, not per-label
+    membership — single-label candidates can only carry one class."""
     if probs is None or not char_spans:
         return []
-        
+
+    background_id = len(label_list)
+    pred_classes = np.argmax(probs, axis=-1)          # [n_candidates]
+    pred_confs = np.max(probs, axis=-1)                # [n_candidates]
+
     if isinstance(threshold, dict):
-        thresh_arr = np.array([threshold[label] for label in label_list])
+        # per-class threshold, keyed by predicted label; background has no
+        # meaningful threshold since we always discard it
+        thresh_arr = np.array([threshold.get(label_list[c], 0.5) if c != background_id else 1.0
+                                for c in pred_classes])
     else:
-        thresh_arr = np.full(len(label_list), threshold)
-        
-    mask = probs >= thresh_arr
-    cand_indices, label_indices = np.where(mask)
-    
+        thresh_arr = np.full(len(pred_classes), threshold)
+
     pred_span_list = [
-        (char_spans[c][0], char_spans[c][1], label_list[l], probs[c, l])
-        for c, l in zip(cand_indices, label_indices)
+        (char_spans[i][0], char_spans[i][1], label_list[pred_classes[i]], pred_confs[i])
+        for i in range(len(pred_classes))
+        if pred_classes[i] != background_id and pred_confs[i] >= thresh_arr[i]
     ]
-    
-    deduped = deduplicate_predictions(pred_span_list, spans_overlap)
-    return [(s, e, l, score) for s, e, l, score in deduped]
+
+    return deduplicate_predictions(pred_span_list, spans_overlap)
 
 
 def main():
@@ -150,7 +156,7 @@ def main():
     # Loop through each record
     config.logger.info("Running inference on %d records...", len(val_records))
     
-    run_id = uuid.uuid4().hex
+    run_id = uuid.uuid4().hex[:8] # 8 character ID
     output_records = []
 
     with torch.inference_mode():
@@ -163,7 +169,7 @@ def main():
             needs, persons = [], []
             for span in spans:
                 item = {
-                    "id": uuid.uuid4().hex,
+                    "id": uuid.uuid4().hex[:8], # 8 character ID
                     "start": span[0],
                     "end": span[1],
                     "label": span[2],

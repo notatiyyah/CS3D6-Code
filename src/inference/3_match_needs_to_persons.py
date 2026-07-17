@@ -64,14 +64,15 @@ def _resolve_span(extracted: str, entity_type: str, household: list[dict], cfg: 
     return None, 0.0
 
 
-def resolve_predictions(record: dict, cfg: Config) -> dict[str, tuple[str, float]]:
+def resolve_relations(record: dict, cfg: Config) -> dict[str, tuple[str, float]]:
     """Resolve each relation in a record to a person ID."""
     household = record.get("household_members", [])
     needs_lookup = {n["id"]: n for n in record.get("needs", [])}
     persons_lookup = {p["id"]: p for p in record.get("persons", [])}
 
-    resolved_needs = {}
+    resolved_needs = {} # Dict need_id: List[(person_id, score)...]
 
+    # Loop through linked needs
     for rel in record.get("relations", []):
         need_id, person_ref_id = (rel[0], rel[1]) # ALWAYS EXPECTS NEED -> PERSON
         
@@ -97,10 +98,8 @@ def resolve_predictions(record: dict, cfg: Config) -> dict[str, tuple[str, float
         person_id, score = _resolve_span(extracted_text, entity_label, household, cfg)
 
         if person_id:
-            # Keep the highest scoring match if multiple references point to the same need
-            if need_id not in resolved_needs or score > resolved_needs[need_id][1]:
-                resolved_needs[need_id] = (person_id, score)
-
+            resolved_needs.setdefault(need_id, []).append((person_id, score))
+    
     return resolved_needs
 
 
@@ -121,9 +120,10 @@ def main():
         run_id = record.get("run_id", "unknown_run")
         model_version = record.get("model_version", "unknown_model")
 
-        resolved_needs = resolve_predictions(record, config)
+        resolved_links = resolve_relations(record, config)
 
         for need in record.get("needs", []):
+            # Set up row
             base_row = {
                 "extracted_need_id": need["id"],
                 "need_label": need["label"],
@@ -137,14 +137,15 @@ def main():
                 "created_at": created_at
             }
 
-            if need["id"] in resolved_needs:
-                person_id, linking_score = resolved_needs[need["id"]]
-                rows.append({
-                    **base_row, 
-                    "target_id": person_id, 
-                    "target_type": "person", 
-                    "linking_confidence": round(linking_score, 4)
-                })
+            # Update targettype and targetid depending on if linked to a person/persons 
+            if need["id"] in resolved_links:
+                for (person_id, linking_score) in resolved_links[need["id"]]:
+                    rows.append({
+                        **base_row, 
+                        "target_id": person_id, 
+                        "target_type": "person", 
+                        "linking_confidence": round(linking_score, 4)
+                    })
             else:
                 for tenure_id in tenure_ids:
                     rows.append({

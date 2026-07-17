@@ -1,6 +1,7 @@
 import numpy as np
 from tabulate import tabulate
 from collections import defaultdict
+from tqdm import tqdm
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 class SpanEvaluator():
@@ -124,29 +125,37 @@ class SpanEvaluator():
         # Calculate Results (Per-label and Overall)
         results = {"per_label": {label: {} for label in self.all_labels}, "overall": {}}
 
+        # Update only the metric parsing loop inside evaluators.py to protect macro math:
         for mode in eval_modes:
             mode_stats = stats[mode]
             label_metrics = []
             
             for label in self.all_labels:
-                p, r, f1 = self._compute_metrics(
-                    mode_stats["tp"][label], mode_stats["fp"][label], mode_stats["fn"][label]
-                )
+                tp = mode_stats["tp"][label]
+                fp = mode_stats["fp"][label]
+                fn = mode_stats["fn"][label]
+                
+                # If a label doesn't appear in the ground truth or predictions for this run, 
+                # don't let a 0 score penalize the overall macro average
+                if tp == 0 and fp == 0 and fn == 0:
+                    continue
+                    
+                p, r, f1 = self._compute_metrics(tp, fp, fn)
                 results["per_label"][label][mode] = {
                     "p": p, "r": r, "f1": f1,
-                    "tp": mode_stats["tp"][label], "fp": mode_stats["fp"][label], "fn": mode_stats["fn"][label]
+                    "tp": tp, "fp": fp, "fn": fn
                 }
                 label_metrics.append((p, r, f1))
                 
-            # Compute macro metrics (average of all labels) and micro metrics (across entire dataset)
             micro_p, micro_r, micro_f1 = self._compute_metrics(
                 mode_stats["tot_tp"], mode_stats["tot_fp"], mode_stats["tot_fn"]
             )
             
+            # Secure macro math averages safely
             results["overall"][mode] = {
-                "macro_p": np.mean([x[0] for x in label_metrics]),
-                "macro_r": np.mean([x[1] for x in label_metrics]),
-                "macro_f1": np.mean([x[2] for x in label_metrics]),
+                "macro_p": np.mean([x[0] for x in label_metrics]) if label_metrics else 0.0,
+                "macro_r": np.mean([x[1] for x in label_metrics]) if label_metrics else 0.0,
+                "macro_f1": np.mean([x[2] for x in label_metrics]) if label_metrics else 0.0,
                 "micro_p": micro_p,
                 "micro_r": micro_r,
                 "micro_f1": micro_f1
@@ -252,7 +261,7 @@ class RelationEvaluator:
         total_tp, total_fp, total_fn = 0, 0, 0
         _gold_fn = gold_fn or self._load_gold_relations
 
-        for doc in val_records:
+        for doc in tqdm(val_records):
             gold = {frozenset(pair) for pair in _gold_fn(doc)}
             pred = {frozenset(pair) for pair in predict_fn(doc)}
 

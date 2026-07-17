@@ -34,6 +34,8 @@ def predict_pairs(doc: dict) -> set:
 
     predicted = set()
     for need in needs:
+        if need['label'].startswith('property_level'):
+            continue # Ignore property level labels. Will never need relations.
         preceding = [p for p in people if p["start"] <= need["start"]]
         if not preceding:
             continue

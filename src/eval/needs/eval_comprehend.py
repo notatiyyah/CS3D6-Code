@@ -54,7 +54,7 @@ def main():
 
     for idx, record in enumerate(val_records):
         # Extract Gold Spans 
-        gold_spans = [(n["start"], n["end"], n["label"]) for n in record.get("needs", []) + record.get("persons")]
+        gold_spans = [(n["start"], n["end"], n["label"]) for n in record.get("needs", [])] + [(p["start"], p["end"], p["label"]) for p in record.get("persons")]
         y_true.append(gold_spans)
 
         pred_spans = []
@@ -72,11 +72,6 @@ def main():
         # Look up this document's predictions in Model C (persons)
         if idx in preds_per and "Entities" in preds_per[idx]:
             for ent in preds_per[idx]["Entities"]:
-                # Map persons to person names and organisations to role (best match for generic categories)
-                if ent["Type"] == "PERSON":
-                    ent["Type"] = "person_name"
-                elif ent["Type"] == "ORGANIZATION":
-                    ent["Type"] = "person_role"
                 pred_spans.append((ent["BeginOffset"], ent["EndOffset"], ent["Type"]))
                     
         y_pred.append(pred_spans)
