@@ -171,7 +171,7 @@ export default function App() {
                 <tbody>
                   {recordAnalysis.linking.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="empty-row">No assignments found for this record.</td>
+                      <td colSpan="6" className="empty-row">No Additional Needs found for this record.</td>
                     </tr>
                   ) : (
                     recordAnalysis.linking.map((link, index) => {
