@@ -31,16 +31,10 @@ class Config:
 
     # Paths
     source_dir: str                = "src"
-    
-    # Training URIs
+    # URIs
     s3_train_data: str             = f"{s3_bucket}data/train_data.json"
     s3_val_data: str               = f"{s3_bucket}data/val_data.json"
     s3_output_path: str            = f"{s3_bucket}output/"
-    
-    # Inference URIs
-    s3_span_model_uri: str         = f"{s3_bucket}models/needs-span-classifier"
-    s3_relation_model_uri: str     = f"{s3_bucket}models/needs-relation-classifier"
-    s3_output_predictions_uri: str = f"{s3_bucket}predictions/"
 
 
 
@@ -59,7 +53,7 @@ def run_train():
 
     # Set up training job
     estimator = PyTorch(
-        entry_point="sagemaker_entrypoint_train.py",
+        entry_point="sagemaker_entrypoint.py",
         source_dir=config.source_dir,
         sagemaker_session=sagemaker_session,
         role=config.role_arn,

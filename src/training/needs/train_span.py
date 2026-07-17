@@ -92,13 +92,15 @@ class SpanDataset(Dataset):
                 for idx, (tok_s, tok_e) in enumerate(offsets):
                     if tok_s == tok_e:
                         continue
-
                     if tok_s < entity["end"] and tok_e > entity["start"]:
                         if tok_start is None:
                             tok_start = idx
                         tok_end = idx + 1
                 if tok_start is not None and tok_end is not None and tok_end > tok_start:
-                    gold_token_spans.setdefault((tok_start, tok_end), set()).add(label2id[entity["label"]])
+                    key = (tok_start, tok_end)
+                    if key in gold_token_spans:
+                        continue  # multi-label span — keeping first label, dropping the rest
+                    gold_token_spans[key] = label2id[entity["label"]]
             self.examples.append({
                 "input_ids": tokenized["input_ids"],
                 "attention_mask": tokenized["attention_mask"],
@@ -114,6 +116,8 @@ class SpanDataset(Dataset):
 
 
 def build_collate_fn(label_list, neg_sample_ratio, neg_sample_floor):
+    background_id = len(label_list)
+
     def collate_fn(batch):
         item = batch[0]
         all_candidates, gold_spans = item["candidates"], item["gold_token_spans"]
@@ -124,12 +128,11 @@ def build_collate_fn(label_list, neg_sample_ratio, neg_sample_floor):
             neg_idxs = random.sample(neg_idxs, n_keep_neg)
         kept_idxs = sorted(pos_idxs + neg_idxs)
 
-        labels = torch.zeros(len(kept_idxs), len(label_list), dtype=torch.float)
+        labels = torch.full((len(kept_idxs),), background_id, dtype=torch.long)
         for new_i, orig_i in enumerate(kept_idxs):
             cand = all_candidates[orig_i]
             if cand in gold_spans:
-                for label_id in gold_spans[cand]:
-                    labels[new_i, label_id] = 1.0
+                labels[new_i] = gold_spans[cand]
 
         return {
             "input_ids": torch.tensor([item["input_ids"]], dtype=torch.long),
@@ -140,16 +143,9 @@ def build_collate_fn(label_list, neg_sample_ratio, neg_sample_floor):
     return collate_fn
 
 
-def compute_metrics(eval_pred, threshold=0.5):
-    """Candidate-level F1 used only for checkpoint selection during training
-    (metric_for_best_model), not the real evaluation. Trainer hands us logits
-    and labels for whichever candidates collate_fn kept for eval (gold spans +
-    sampled negatives), not the full per-document candidate set — so this is
-    a binary-classification proxy over sampled candidates, not document-level
-    loose/strict span F1. Use eval_span.py for the real numbers.
-    """
-    probs = 1 / (1 + np.exp(-eval_pred.predictions))
-    preds = (probs > threshold).astype(int)
+def compute_metrics(eval_pred):
+    """Candidate-level accuracy proxy for checkpoint selection only. Not real eval."""
+    preds = np.argmax(eval_pred.predictions, axis=-1)
     labels = eval_pred.label_ids
     return {
         "f1_micro": f1_score(labels, preds, average="micro", zero_division=0),
@@ -165,15 +161,14 @@ class SpanTrainer(Trainer):
         return (outputs["loss"], outputs) if return_outputs else outputs["loss"]
 
 
-def compute_pos_weight(train_ds, num_labels, cap, device):
-    pos_counts = torch.zeros(num_labels)
-    total_candidates = 0
+def compute_class_weight(train_ds, num_labels, cap, device):
+    counts = torch.zeros(num_labels + 1)
     for ex in train_ds.examples:
-        total_candidates += len(ex["candidates"])
-        for l_ids in ex["gold_token_spans"].values():
-            for lid in l_ids:
-                pos_counts[lid] += 1
-    return ((total_candidates - pos_counts) / pos_counts.clamp(min=1)).clamp(max=cap).to(device)
+        counts[num_labels] += len(ex["candidates"]) - len(ex["gold_token_spans"])
+        for label_id in ex["gold_token_spans"].values():
+            counts[label_id] += 1
+    total = counts.sum()
+    return (total / counts.clamp(min=1)).clamp(max=cap).to(device)
 
 
 def main():
@@ -195,8 +190,8 @@ def main():
     train_ds = SpanDataset(train_records, tokenizer, label2id, config.training.max_candidate_size, config.training.max_length)
     val_ds = SpanDataset(val_records, tokenizer, label2id, config.training.max_candidate_size, config.training.max_length)
 
-    pos_weight = compute_pos_weight(train_ds, len(label_list), config.training.pos_weight_cap, config.device)
-    model = SpanClassifier(config.training.base_model, len(label_list), pos_weight).to(config.device)
+    class_weight = compute_class_weight(train_ds, len(label_list), config.training.pos_weight_cap, config.device)
+    model = SpanClassifier(config.training.base_model, len(label_list), class_weight).to(config.device)
 
     collate_fn = build_collate_fn(label_list, config.training.neg_sample_ratio, config.training.neg_sample_floor)
 

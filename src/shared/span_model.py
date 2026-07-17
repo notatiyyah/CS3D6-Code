@@ -15,18 +15,19 @@ def spans_overlap(a_start, a_end, b_start, b_end):
     return max(a_start, b_start) < min(a_end, b_end)
 
 class SpanClassifier(nn.Module):
-    def __init__(self, base_model: str, num_labels: int, pos_weight=None):
+    def __init__(self, base_model: str, num_labels: int, class_weight=None):
         super().__init__()
         self.backbone = AutoModel.from_pretrained(base_model)
-        self.classifier = nn.Linear(self.backbone.config.hidden_size * 2, num_labels)
-        self.pos_weight = pos_weight
+        # +1 for the background ("no entity") class
+        self.classifier = nn.Linear(self.backbone.config.hidden_size * 2, num_labels + 1)
+        self.class_weight = class_weight
 
     def forward(self, input_ids, attention_mask, candidate_spans, labels=None):
         hidden_states = self.backbone(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[0]
         start_vecs = hidden_states[candidate_spans[:, 0]]
         end_vecs = hidden_states[candidate_spans[:, 1] - 1]
         logits = self.classifier(torch.cat([start_vecs, end_vecs], dim=1))
-        loss = nn.BCEWithLogitsLoss(pos_weight=self.pos_weight)(logits, labels) if labels is not None else None
+        loss = nn.CrossEntropyLoss(weight=self.class_weight)(logits, labels) if labels is not None else None
         return {"loss": loss, "logits": logits} if loss is not None else {"logits": logits}
 
 

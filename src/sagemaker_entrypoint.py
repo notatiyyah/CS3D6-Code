@@ -4,8 +4,8 @@ This script just wraps the 'main' function of whatever training script you choos
 '''
 
 # # from training.needs.train_bio import main
-from training.needs.train_span import main
-# # from training.relations.relation_extraction import main
+# from training.needs.train_span import main
+from training.relations.relation_extraction import main
 
 if __name__ == "__main__":
     main()
