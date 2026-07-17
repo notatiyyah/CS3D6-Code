@@ -54,7 +54,7 @@ def get_athena_data(config, note_ids, database):
     formatted_ids = ",".join([f"'{nid}'" for nid in note_ids])
     
     query = f"""
-        SELECT DISTINCT
+        SELECT
             note_id, 
             tenure_id,
             note_content AS original_text,
