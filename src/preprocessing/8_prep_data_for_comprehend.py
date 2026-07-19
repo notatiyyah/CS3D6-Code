@@ -74,6 +74,13 @@ class Config:
         "person_name",
     }
 
+def export_records_file(records):
+    '''Flatten the text for ONE_DOC_PER_LINE (remove any newlines)'''
+    return [
+        r.get("text", "").replace('\n', ' ')
+        for r in records
+    ]
+
 def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_filename, logger):
     """
     Filters the dataset for the target model group and writes to a compliant csv annotations file (using pandas)
@@ -82,21 +89,16 @@ def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_fil
     annotations_data = [] # List to hold all our row dictionaries
     
     for idx, record in enumerate(records):
-        # 1. Flatten the text for ONE_DOC_PER_LINE (remove any newlines)
-        text = record.get("text", "").replace('\n', ' ')
-        raw_texts.append(text)
-        
-        raw_entities = record.get("needs", []) + record.get("persons", [])
+        raw_entities = [] + record.get("needs", []) + record.get("persons", [])
         
         pool = []
         for ent in raw_entities:
-            if ent["label"] in target_labels:
+            if ent.get("label") in target_labels:
                 pool.append(ent)
                 
         clean_entities = resolve_overlaps_longest_span(pool)
         
-        # 2. Append a separate row for EVERY entity found in this line
-        # This solves the "multiple entities per document" requirement
+        # Append a separate row for every entity in this record
         for ent in clean_entities:
             annotations_data.append({
                 "File": docs_filename,
@@ -106,13 +108,10 @@ def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_fil
                 "Type": ent["label"].upper() # Uppercase for comprehend
             })
 
-    # 3. Write Annotations CSV using pandas
+    # Write Annotations CSV using pandas
     logger.info("Saving annotations to %s...", output_csv)
     df = pd.DataFrame(annotations_data, columns=["File", "Line", "Begin Offset", "End Offset", "Type"])
     df.to_csv(output_csv, index=False, encoding='utf-8')
-
-    return raw_texts
-
 
 def main():
     config = Config()
@@ -124,11 +123,11 @@ def main():
 
     # --- Training Data ---
     # Model A
-    raw_texts = export_clean_comprehend_dataset(
+    export_clean_comprehend_dataset(
         records=raw_train, 
         target_labels=config.MODEL_A_LABELS, 
         output_csv=PROCESSED / config.train_anno_output.format(partition='a'),
-        docs_filename=config.train_docs_output.name,
+        docs_filename=config.train_docs_output,
         logger=config.logger
     )
     # Model B
@@ -136,7 +135,7 @@ def main():
         records=raw_train, 
         target_labels=config.MODEL_B_LABELS, 
         output_csv=PROCESSED / config.train_anno_output.format(partition='b'),
-        docs_filename=config.train_docs_output.name,
+        docs_filename=config.train_docs_output,
         logger=config.logger
     )
     # Model c
@@ -144,23 +143,24 @@ def main():
         records=raw_train, 
         target_labels=config.MODEL_C_LABELS, 
         output_csv=PROCESSED / config.train_anno_output.format(partition='c'),
-        docs_filename=config.train_docs_output.name,
+        docs_filename=config.train_docs_output,
         logger=config.logger
     )
     
     # Write Train Documents TXT once
+    train_docs = export_records_file(raw_train)
     config.logger.info("Saving documents to %s...", config.train_docs_output)
     with open(config.train_docs_output, 'w', encoding='utf-8') as f_txt:
-        for text in raw_texts:
+        for text in train_docs:
             f_txt.write(text + '\n')
 
     # --- Validation Data ---
     # Model A
-    raw_texts = export_clean_comprehend_dataset(
+    export_clean_comprehend_dataset(
         records=raw_val, 
         target_labels=config.MODEL_A_LABELS, 
         output_csv=PROCESSED / config.val_anno_output.format(partition='a'),
-        docs_filename=config.val_docs_output.name,
+        docs_filename=config.val_docs_output,
         logger=config.logger
     )
     # Model B
@@ -168,7 +168,7 @@ def main():
         records=raw_val, 
         target_labels=config.MODEL_B_LABELS, 
         output_csv=PROCESSED / config.val_anno_output.format(partition='b'),
-        docs_filename=config.val_docs_output.name,
+        docs_filename=config.val_docs_output,
         logger=config.logger
     )
     # Model C
@@ -176,28 +176,23 @@ def main():
         records=raw_val, 
         target_labels=config.MODEL_C_LABELS, 
         output_csv=PROCESSED / config.val_anno_output.format(partition='c'),
-        docs_filename=config.val_docs_output.name,
+        docs_filename=config.val_docs_output,
         logger=config.logger
     )
 
     # Write Val Documents TXT once
+    val_docs = export_records_file(raw_val)
     config.logger.info("Saving documents to %s...", config.val_docs_output)
     with open(config.val_docs_output, 'w', encoding='utf-8') as f_txt:
-        for text in raw_texts:
+        for text in val_docs:
             f_txt.write(text + '\n')
 
     # --- Test Data ---
-    raw_texts = export_clean_comprehend_dataset(
-        records=raw_test, 
-        target_labels=None, 
-        output_csv=None,
-        docs_filename=config.test_docs_output.name,
-        logger=config.logger
-    )
     # Write Test Documents TXT once
+    test_docs = export_records_file(raw_test)
     config.logger.info("Saving documents to %s...", config.test_docs_output)
     with open(config.test_docs_output, 'w', encoding='utf-8') as f_txt:
-        for text in raw_texts:
+        for text in test_docs:
             f_txt.write(text + '\n')
     
     config.logger.info('Data Split Completed.')

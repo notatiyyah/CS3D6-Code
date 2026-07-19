@@ -178,12 +178,11 @@ def main():
                         "linking_conf": None
                     })
 
+    # Convert to DataFrame and save to CSV
     columns = ["note_id", "target_id", "target_type", "model", 
         "created_at", "need_id", "need_label", "need_text", "start", "end", 
         "need_conf", "relation_conf", "linking_conf"
     ]
-
-    # Convert to DataFrame and save to CSV
     df = pd.DataFrame(rows, columns=columns)
     df.to_csv(config.output_path, index=False, encoding="utf-8")
 

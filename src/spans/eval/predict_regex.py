@@ -10,7 +10,7 @@ import uuid
 
 import pandas as pd
 
-from common.paths import PROCESSED, PREDICTIONS, VAL_DATA
+from common.paths import PROCESSED, PREDICTIONS, VAL_DATA, TEST_DATA
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
 
@@ -18,7 +18,7 @@ from common.json_helpers import load_json, save_json
 @dataclass
 class Config:
     model_name: str = "regex"
-    val_path: Path = VAL_DATA
+    val_path: Path = TEST_DATA
     taxonomy_path: Path = PROCESSED / "taxonomy_autogen_v3.csv"
     person_labels: List[str] = field(default_factory=lambda: ["person_role", "person_name"])
 

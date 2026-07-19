@@ -9,14 +9,14 @@ from typing import List
 import uuid
 
 from common.json_helpers import load_json, save_json
-from common.paths import PROCESSED, ANNOTATIONS, PREDICTIONS, VAL_DATA
+from common.paths import PROCESSED, ANNOTATIONS, PREDICTIONS, VAL_DATA, TEST_DATA
 from common.logging import setup_logger
 
 
 @dataclass
 class Config:
     model_name: str = "comprehend"
-    val_path: Path = VAL_DATA
+    val_path: Path = TEST_DATA
     preds_model_a_path: Path = ANNOTATIONS / "comprehend_output_a.jsonl"
     preds_model_b_path: Path = ANNOTATIONS / "comprehend_output_b.jsonl"
     preds_model_c_path: Path = ANNOTATIONS / "comprehend_output_c.jsonl"

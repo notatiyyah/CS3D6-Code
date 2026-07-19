@@ -11,7 +11,7 @@ from tqdm import tqdm
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from common.paths import PROCESSED, PREDICTIONS, VAL_DATA
+from common.paths import PROCESSED, PREDICTIONS, TEST_DATA
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
 from shared.relation_model import insert_markers, SPECIAL_TOKENS
@@ -125,7 +125,7 @@ def main():
         print("Usage: python predict_model.py <path/to/final_model> [<data_path>]")
         sys.exit(1)
 
-    config = Config(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else VAL_DATA)
+    config = Config(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else TEST_DATA)
     config.logger.info(f"Generating relation predictions (model={config.model_dir}, data={config.data_path.name})")
 
     # Load data

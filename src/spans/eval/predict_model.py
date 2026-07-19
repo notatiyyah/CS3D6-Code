@@ -14,7 +14,7 @@ from safetensors.torch import load_file
 from transformers import AutoTokenizer
 from tqdm import tqdm
 
-from common.paths import METRICS, PREDICTIONS, VAL_DATA
+from common.paths import METRICS, PREDICTIONS, VAL_DATA, TEST_DATA
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
 from shared.evaluators import SpanEvaluator
@@ -24,7 +24,7 @@ from shared.span_model import SpanClassifier, generate_candidates, spans_overlap
 @dataclass
 class Config:
     model_dir: Path
-    data_path: Path = VAL_DATA
+    data_path: Path = TEST_DATA
     person_labels: List[str] = field(default_factory=lambda: ["person_role", "person_name"])
 
     def __post_init__(self):

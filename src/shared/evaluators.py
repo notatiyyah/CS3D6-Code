@@ -1,8 +1,9 @@
 import numpy as np
 from tabulate import tabulate
 from collections import defaultdict
-from tqdm import tqdm
 from sklearn.metrics import f1_score, precision_score, recall_score
+
+from common.data_utils import span_iou
 
 class SpanEvaluator():
     """
@@ -86,14 +87,6 @@ class SpanEvaluator():
     def _score_strict(ps, pe, ts, te):
         return 1.0 if (ps == ts and pe == te) else 0.0
 
-    @staticmethod
-    def compute_iou(a_start, a_end, b_start, b_end):
-        """Intersection over Union of two character ranges. 1.0 = exact match,
-        0.0 = no overlap."""
-        intersection = max(0, min(a_end, b_end) - max(a_start, b_start))
-        union = (a_end - a_start) + (b_end - b_start) - intersection
-        return intersection / union if union > 0 else 0.0
-
     def evaluate(self, y_true_docs, y_pred_docs):
         """
         y_true_docs: List of lists. Each inner list contains (start, end, label) tuples.
@@ -120,7 +113,7 @@ class SpanEvaluator():
             
             for thresh in self.iou_thresholds:
                 self._match_and_update(stats[f"iou_{thresh}"], true_spans, pred_spans, 
-                                       self.compute_iou, threshold=thresh)
+                                       span_iou, threshold=thresh)
 
         # Calculate Results (Per-label and Overall)
         results = {"per_label": {label: {} for label in self.all_labels}, "overall": {}}
@@ -245,16 +238,14 @@ class RelationEvaluator:
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
         return p, r, f1
 
-    def evaluate(self, y_preds: list, y: list, threshold: float = 0.5) -> dict:
+    def evaluate(self, y_preds: list, y: list) -> dict:
         """Evaluate relation scores against gold labels.
         Expects list of [from, to, confidence] for y_preds and [from, to] for y_true.
         """
-        # Keep only predictions above threshold
         pred_pairs = {
             (rel[0], rel[1])
             for doc_preds in y_preds
             for rel in doc_preds
-            if rel[2] >= threshold
         }
 
         true_pairs = {

@@ -8,7 +8,7 @@ from typing import List, Dict
 import pandas as pd
 from tabulate import tabulate
 
-from common.paths import VAL_DATA, METRICS, PREDICTIONS
+from common.paths import VAL_DATA, TEST_DATA, METRICS, PREDICTIONS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
 from shared.evaluators import SpanEvaluator
@@ -16,8 +16,8 @@ from shared.evaluators import SpanEvaluator
 
 @dataclass
 class Config:
-    val_path: Path = VAL_DATA
-    methods: List[str] = field(default_factory=lambda: ["regex", "span-classifier-4", "comprehend"]) # TODO: Make this into arg.
+    val_path: Path = TEST_DATA
+    methods: List[str] = field(default_factory=lambda: ["regex", "span-classifier-4", "comprehend", "gemini"]) # TODO: Make this into arg.
 
     def __post_init__(self):
         self.logger = setup_logger("eval.spans", "eval_spans.log")
@@ -53,13 +53,10 @@ def generate_summary_table(results_by_method, all_labels, output_path, logger):
         summary_data.append(
             {
                 "Method": method,
-
                 "Macro F1 (strict)": results.get("overall", {}).get("strict", {}).get("macro_f1", 0),
                 "Micro F1 (strict)": results.get("overall", {}).get("strict", {}).get("micro_f1", 0),
-
                 "Macro F1 (iou_0.5)": results.get("overall", {}).get("iou_0.5", {}).get("macro_f1", 0),
                 "Micro F1 (iou_0.5)": results.get("overall", {}).get("iou_0.5", {}).get("micro_f1", 0),
-
                 "Macro F1 (loose)": results.get("overall", {}).get("loose", {}).get("macro_f1", 0),
                 "Micro F1 (loose)": results.get("overall", {}).get("loose", {}).get("micro_f1", 0),
             }

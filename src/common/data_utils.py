@@ -30,3 +30,8 @@ def resolve_overlaps_longest_span(entities):
             resolved_entities.append(current_ent)
             
     return resolved_entities
+
+def span_iou(a_start: int, a_end: int, b_start: int, b_end: int) -> float:
+    intersection = max(0, min(a_end, b_end) - max(a_start, b_start))
+    union = max(a_end, b_end) - min(a_start, b_start)
+    return intersection / union if union > 0 else 0.0

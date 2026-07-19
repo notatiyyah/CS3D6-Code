@@ -215,6 +215,7 @@ def main():
         ]
         results_by_threshold[threshold] = evaluator.evaluate(y_true, y_pred)
 
+    # Choose theeshold for each class
     config.logger.info("Finding champion threshold for each class...")
     optimized_thresholds = {}
     for label in label_list:

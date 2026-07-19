@@ -9,14 +9,14 @@ from dataclasses import dataclass
 from typing import Dict, List, Set, Tuple
 from pathlib import Path
 
-from common.paths import PROCESSED, PREDICTIONS, VAL_DATA
+from common.paths import PROCESSED, PREDICTIONS, VAL_DATA, TEST_DATA
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
 
 
 @dataclass
 class Config:
-    data_path: Path = VAL_DATA # Can be overridden by predicted spans
+    data_path: Path = TEST_DATA # Can be overridden by predicted spans
     model_name: str = "closest_match"
     output_dir: Path = PREDICTIONS
     output_filename: str = "relation.{model_names}.json"
