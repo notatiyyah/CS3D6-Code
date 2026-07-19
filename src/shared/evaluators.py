@@ -230,21 +230,14 @@ class SpanEvaluator():
 
 class RelationEvaluator:
     """
-    Evaluator for relation extraction. Scores predicted (need_id, person_id)
-    pairs against gold relations using unordered pair-level exact match.
+    Evaluator for relation extraction.
 
-    Gold relations are matched bidirectionally.
+    Takes flat lists of predicted scores and gold labels, thresholds the
+    predictions, and computes precision/recall/F1.
     """
 
     def __init__(self, logger):
         self.logger = logger
-
-    def _load_gold_relations(self, doc: dict) -> set:
-        valid = set()
-        for rel in doc.get("relations", []):
-            a, b = str(rel["from"]).strip(), str(rel["to"]).strip()
-            valid.add(frozenset((a, b)))
-        return valid
 
     def _compute_metrics(self, tp: int, fp: int, fn: int):
         p = tp / (tp + fp) if (tp + fp) > 0 else 0.0
@@ -252,29 +245,40 @@ class RelationEvaluator:
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
         return p, r, f1
 
-    def evaluate(self, val_records: list, predict_fn, gold_fn=None) -> dict:
+    def evaluate(self, y_preds: list, y: list, threshold: float = 0.5) -> dict:
+        """Evaluate relation scores against gold labels.
+        Expects list of [from, to, confidence] for y_preds and [from, to] for y_true.
         """
-        predict_fn(doc) -> set of (need_id, person_id) pairs.
-        gold_fn(doc)   -> set of pairs (optional; defaults to _load_gold_relations).
-        Returns {precision, recall, f1, tp, fp, fn}.
-        """
-        total_tp, total_fp, total_fn = 0, 0, 0
-        _gold_fn = gold_fn or self._load_gold_relations
+        # Keep only predictions above threshold
+        pred_pairs = {
+            (rel[0], rel[1])
+            for doc_preds in y_preds
+            for rel in doc_preds
+            if rel[2] >= threshold
+        }
 
-        for doc in tqdm(val_records):
-            gold = {frozenset(pair) for pair in _gold_fn(doc)}
-            pred = {frozenset(pair) for pair in predict_fn(doc)}
+        true_pairs = {
+            (rel[0], rel[1])
+            for doc_labels in y
+            for rel in doc_labels
+        }
 
-            tp = len(gold & pred)
-            fp = len(pred - gold)
-            fn = len(gold - pred)
-            total_tp += tp
-            total_fp += fp
-            total_fn += fn
+        tp = len(pred_pairs & true_pairs)
+        fp = len(pred_pairs - true_pairs)
+        fn = len(true_pairs - pred_pairs)
 
-        p, r, f1 = self._compute_metrics(total_tp, total_fp, total_fn)
-        return {"precision": p, "recall": r, "f1": f1,
-                "tp": total_tp, "fp": total_fp, "fn": total_fn}
+        precision, recall, f1 = self._compute_metrics(tp, fp, fn)
+
+        return {
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "predicted_pairs": len(pred_pairs),
+            "gold_pairs": len(true_pairs),
+        }
 
     def print_report(self, results: dict, title: str = "RELATION EXTRACTION"):
         self.logger.info(f"=== {title} ===")

@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from transformers import AutoTokenizer, Trainer, TrainingArguments, EarlyStoppingCallback
 from safetensors.torch import save_file
 
-from common.paths import MODELS, PROCESSED
+from common.paths import MODELS, PROCESSED, TRAIN_DATA, VAL_DATA
 from common.logging import setup_logger, FileLogCallback
 from common.json_helpers import load_json, save_json
 from shared.span_model import SpanClassifier, generate_candidates
@@ -48,8 +48,8 @@ class Config:
     train_dir = Path(os.environ.get("SM_CHANNEL_TRAIN", PROCESSED))
     val_dir = Path(os.environ.get("SM_CHANNEL_VAL", PROCESSED))
     
-    train_path = train_dir / "train_data.json"
-    val_path = val_dir / "val_data.json"
+    train_path = TRAIN_DATA
+    val_path = VAL_DATA
 
     training: TrainingConfig = field(default_factory=TrainingConfig)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

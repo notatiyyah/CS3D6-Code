@@ -10,7 +10,7 @@ import pandas as pd
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 
 from common.logging import setup_logger
-from common.paths import PROCESSED
+from common.paths import PROCESSED, TRAIN_DATA, VAL_DATA, TEST_DATA
 from common.json_helpers import load_json, save_json
 from common.graph_helpers import make_binary_label_matrix
 
@@ -19,9 +19,9 @@ class Config:
 
     input_data_path = PROCESSED / "gold_standard_with_households.json"
     taxonomy_path = PROCESSED / "taxonomy_autogen_v3.csv"
-    train_output = PROCESSED / "train_data.json"
-    val_output = PROCESSED / "val_data.json"
-    test_output = PROCESSED / "test_data.json"
+    train_output = TRAIN_DATA
+    val_output = VAL_DATA
+    test_output = TEST_DATA
 
     test_size = 0.15
     validation_size = 0.176  # (17.6% of 85% = ~15% total)

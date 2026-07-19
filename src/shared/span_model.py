@@ -18,7 +18,7 @@ class SpanClassifier(nn.Module):
     def __init__(self, base_model: str, num_labels: int, class_weight=None):
         super().__init__()
         self.backbone = AutoModel.from_pretrained(base_model)
-        # +1 for the background ("no entity") class
+        # +1 for the ("no entity") class
         self.classifier = nn.Linear(self.backbone.config.hidden_size * 2, num_labels + 1)
         self.class_weight = class_weight
 
@@ -41,25 +41,3 @@ def generate_candidates(offsets, max_size: int):
             if window[-1] - window[0] == size - 1:
                 candidates.append((window[0], window[-1] + 1))
     return candidates
-
-
-def deduplicate_predictions(pred_spans, spans_overlap_fn):
-    """Keep the highest-confidence prediction when spans overlap for the same label.
-    pred_spans: list of (start, end, label, confidence)."""
-    from collections import defaultdict # Just in case this wasn't imported globally
-    
-    by_label = defaultdict(list)
-    for start, end, label, conf in pred_spans:
-        by_label[label].append((start, end, conf))
-
-    deduped = []
-    for label, spans in by_label.items():
-        spans.sort(key=lambda x: x[2], reverse=True)
-        kept = []
-        for start, end, conf in spans:
-            if not any(spans_overlap_fn(start, end, k_start, k_end) for k_start, k_end, _ in kept):
-                kept.append((start, end, conf))
-        # FIX: Include the confidence 'c' in the final returned tuple
-        deduped.extend([(s, e, label, c) for s, e, c in kept])
-
-    return deduped

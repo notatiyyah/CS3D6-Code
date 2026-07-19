@@ -1,5 +1,5 @@
 """
-ALBERT Relation Extraction — Needs to Person.
+Relation Extraction — Needs to Person.
 
 Binary sequence classification to determine if a specific 'need' span applies
 to a specific 'person' span. Relies on upstream models to provide the entity
@@ -29,7 +29,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-from common.paths import MODELS, PROCESSED
+from common.paths import MODELS, PROCESSED, TRAIN_DATA, VAL_DATA
 from common.logging import setup_logger, FileLogCallback
 from common.json_helpers import save_json
 from shared.relation_model import insert_markers, SPECIAL_TOKENS
@@ -38,7 +38,7 @@ from shared.relation_model import insert_markers, SPECIAL_TOKENS
 # --- Config ---
 @dataclass
 class TrainingConfig:
-    base_model: str = "albert-base-v2"
+    base_model: str = "roberta-base"
     learning_rate: float = 1e-5
     train_batch_size: int = 4
     eval_batch_size: int = 16
@@ -46,7 +46,7 @@ class TrainingConfig:
     epochs: int = 5
     weight_decay: float = 0.01
     max_grad_norm: float = 1.0
-    max_length: int = 512
+    max_length: int = 256
     logging_steps: int = 200
     early_stopping_patience: int = 2
     fp16: bool = True
@@ -60,8 +60,8 @@ class Config:
     train_dir = Path(os.environ.get("SM_CHANNEL_TRAIN", PROCESSED))
     val_dir = Path(os.environ.get("SM_CHANNEL_VAL", PROCESSED))
     
-    train_path = train_dir / "train_data.json"
-    val_path = val_dir / "val_data.json"
+    train_path = TRAIN_DATA
+    val_path = VAL_DATA
 
     training: TrainingConfig = field(default_factory=TrainingConfig)
     device = (

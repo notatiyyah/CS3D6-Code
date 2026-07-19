@@ -22,16 +22,3 @@ def insert_markers(text: str, need: dict, person: dict) -> str:
 
     return marked_text
 
-
-def load_gold_relations(doc: dict) -> set:
-    """Gold relation pairs as (need_id, person_id), matching both directions
-    as 'linked' since source annotations were inconsistent about from/to
-    direction — same safety net used at training time."""
-    valid_relations = set()
-    for rel in doc.get("relations", []):
-        rel_from = str(rel["from"]).strip()
-        rel_to = str(rel["to"]).strip()
-        valid_relations.add((rel_from, rel_to))
-        valid_relations.add((rel_to, rel_from))
-    return valid_relations
-

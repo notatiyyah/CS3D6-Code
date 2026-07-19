@@ -3,20 +3,23 @@ import pandas as pd
 
 from common.json_helpers import load_json, save_json
 from common.logging import setup_logger
-from common.paths import PROCESSED
+from common.paths import PROCESSED, TRAIN_DATA, VAL_DATA, TEST_DATA
 from common.data_utils import resolve_overlaps_longest_span
 
 class Config:
-    LOGGER = setup_logger("preprocessing.format_comprehend", "preprocess.format_comprehend.log")
+    logger = setup_logger("preprocessing.format_comprehend", "preprocess.format_comprehend.log")
 
-    TRAIN_DATA_PATH = PROCESSED / "train_data.json"
-    VAL_DATA_PATH = PROCESSED / "val_data.json"
+    train_data_path = TRAIN_DATA
+    val_data_path = VAL_DATA
+    test_data_path = TEST_DATA
     
-    # Define both JSONL and TXT output patterns
-    TRAIN_ANNO_OUTPUT = "train_data_comprehend_{partition}.csv"
-    VAL_ANNO_OUTPUT = "val_data_comprehend_{partition}.csv"
-    TRAIN_DOCS_OUTPUT = PROCESSED / "train_data_comprehend.txt"
-    VAL_DOCS_OUTPUT = PROCESSED / "val_data_comprehend.txt"
+    # Define both JSONL patterns and TXT output paths
+    train_anno_output = "train_data_comprehend_{partition}.csv"
+    val_anno_output = "val_data_comprehend_{partition}.csv"
+    train_docs_output = PROCESSED / "train_data_comprehend.txt"
+    val_docs_output = PROCESSED / "val_data_comprehend.txt"
+    val_docs_output = PROCESSED / "val_data_comprehend.txt"
+    test_docs_output = PROCESSED / "test_data_comprehend.txt"
 
     # Split labels evenly
     # Note: When setting up in AWS Comprehend, these must be uppercase snake case.
@@ -65,7 +68,7 @@ class Config:
         "mobility_mobility_physical",
     }
 
-    # just person references
+    # Just person references
     MODEL_C_LABELS = {
         "person_role",
         "person_name",
@@ -113,40 +116,41 @@ def export_clean_comprehend_dataset(records, target_labels, output_csv, docs_fil
 
 def main():
     config = Config()
-    config.LOGGER.info('Starting AWS Comprehend Data Split...')
+    config.logger.info('Starting AWS Comprehend Data Split...')
 
-    raw_train = load_json(config.TRAIN_DATA_PATH, config.LOGGER)
-    raw_val = load_json(config.VAL_DATA_PATH, config.LOGGER)
+    raw_train = load_json(config.train_data_path, config.logger)
+    raw_val = load_json(config.val_data_path, config.logger)
+    raw_test = load_json(config.test_data_path, config.logger)
 
     # --- Training Data ---
     # Model A
     raw_texts = export_clean_comprehend_dataset(
         records=raw_train, 
         target_labels=config.MODEL_A_LABELS, 
-        output_csv=PROCESSED / config.TRAIN_ANNO_OUTPUT.format(partition='a'),
-        docs_filename=config.TRAIN_DOCS_OUTPUT.name,
-        logger=config.LOGGER
+        output_csv=PROCESSED / config.train_anno_output.format(partition='a'),
+        docs_filename=config.train_docs_output.name,
+        logger=config.logger
     )
     # Model B
     export_clean_comprehend_dataset(
         records=raw_train, 
         target_labels=config.MODEL_B_LABELS, 
-        output_csv=PROCESSED / config.TRAIN_ANNO_OUTPUT.format(partition='b'),
-        docs_filename=config.TRAIN_DOCS_OUTPUT.name,
-        logger=config.LOGGER
+        output_csv=PROCESSED / config.train_anno_output.format(partition='b'),
+        docs_filename=config.train_docs_output.name,
+        logger=config.logger
     )
     # Model c
     export_clean_comprehend_dataset(
         records=raw_train, 
         target_labels=config.MODEL_C_LABELS, 
-        output_csv=PROCESSED / config.TRAIN_ANNO_OUTPUT.format(partition='c'),
-        docs_filename=config.TRAIN_DOCS_OUTPUT.name,
-        logger=config.LOGGER
+        output_csv=PROCESSED / config.train_anno_output.format(partition='c'),
+        docs_filename=config.train_docs_output.name,
+        logger=config.logger
     )
     
     # Write Train Documents TXT once
-    config.LOGGER.info("Saving documents to %s...", config.TRAIN_DOCS_OUTPUT)
-    with open(config.TRAIN_DOCS_OUTPUT, 'w', encoding='utf-8') as f_txt:
+    config.logger.info("Saving documents to %s...", config.train_docs_output)
+    with open(config.train_docs_output, 'w', encoding='utf-8') as f_txt:
         for text in raw_texts:
             f_txt.write(text + '\n')
 
@@ -155,35 +159,49 @@ def main():
     raw_texts = export_clean_comprehend_dataset(
         records=raw_val, 
         target_labels=config.MODEL_A_LABELS, 
-        output_csv=PROCESSED / config.VAL_ANNO_OUTPUT.format(partition='a'),
-        docs_filename=config.VAL_DOCS_OUTPUT.name,
-        logger=config.LOGGER
+        output_csv=PROCESSED / config.val_anno_output.format(partition='a'),
+        docs_filename=config.val_docs_output.name,
+        logger=config.logger
     )
     # Model B
     export_clean_comprehend_dataset(
         records=raw_val, 
         target_labels=config.MODEL_B_LABELS, 
-        output_csv=PROCESSED / config.VAL_ANNO_OUTPUT.format(partition='b'),
-        docs_filename=config.VAL_DOCS_OUTPUT.name,
-        logger=config.LOGGER
+        output_csv=PROCESSED / config.val_anno_output.format(partition='b'),
+        docs_filename=config.val_docs_output.name,
+        logger=config.logger
     )
     # Model C
     export_clean_comprehend_dataset(
         records=raw_val, 
         target_labels=config.MODEL_C_LABELS, 
-        output_csv=PROCESSED / config.VAL_ANNO_OUTPUT.format(partition='c'),
-        docs_filename=config.VAL_DOCS_OUTPUT.name,
-        logger=config.LOGGER
+        output_csv=PROCESSED / config.val_anno_output.format(partition='c'),
+        docs_filename=config.val_docs_output.name,
+        logger=config.logger
     )
 
     # Write Val Documents TXT once
-    config.LOGGER.info("Saving documents to %s...", config.VAL_DOCS_OUTPUT)
-    with open(config.VAL_DOCS_OUTPUT, 'w', encoding='utf-8') as f_txt:
+    config.logger.info("Saving documents to %s...", config.val_docs_output)
+    with open(config.val_docs_output, 'w', encoding='utf-8') as f_txt:
+        for text in raw_texts:
+            f_txt.write(text + '\n')
+
+    # --- Test Data ---
+    raw_texts = export_clean_comprehend_dataset(
+        records=raw_test, 
+        target_labels=None, 
+        output_csv=None,
+        docs_filename=config.test_docs_output.name,
+        logger=config.logger
+    )
+    # Write Test Documents TXT once
+    config.logger.info("Saving documents to %s...", config.test_docs_output)
+    with open(config.test_docs_output, 'w', encoding='utf-8') as f_txt:
         for text in raw_texts:
             f_txt.write(text + '\n')
     
-    config.LOGGER.info('Data Split Completed.')
-    config.LOGGER.info('LABELS: \nA: %s \nB: %s \nC: %s', [l.upper() for l in config.MODEL_A_LABELS], [l.upper() for l in config.MODEL_B_LABELS], [l.upper() for l in config.MODEL_C_LABELS])
+    config.logger.info('Data Split Completed.')
+    config.logger.info('LABELS: \nA: %s \nB: %s \nC: %s', [l.upper() for l in config.MODEL_A_LABELS], [l.upper() for l in config.MODEL_B_LABELS], [l.upper() for l in config.MODEL_C_LABELS])
 
 if __name__ == '__main__':
     main()
