@@ -15,6 +15,6 @@ Copy your data files into `public/data/` before starting:
 
 ```
 public/data/
-├── val_data.json                                  # ground truth (val or test)
-└── e2e.<span_run>_<relation_run>.json             # predictions from inference
-└── entity linking.<span_run>_<relation_run>.csv   # household attributions (post-processing)
+├── test_data.json                          # ground truth (val or test)
+└── <relation_model>_<span_model>_.json     # predictions from inference
+└── e2e_<relation_model>_<span_model>.csv   # household attributions (post-processing)

@@ -1,5 +1,6 @@
 """
-Retroactively adds pseudonymised household members data to gold standard data. (Should have been done in sampling notebook...)
+Retroactively adds pseudonymised household members data to gold standard data from AWS Athena.
+(Should have been done in sampling notebook...)
 """
 
 import json

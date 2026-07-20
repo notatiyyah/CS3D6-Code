@@ -1,3 +1,9 @@
+"""
+Converts training, validation, and test data into CSV and TXT files for AWS Comprehend.
+Comprehend NER can only do a maximum of 25 classes, and does not handle overlaps, so we split into 
+three separate classifiers (see Config), and resolve overlaps.
+"""
+
 import json
 import pandas as pd
 
