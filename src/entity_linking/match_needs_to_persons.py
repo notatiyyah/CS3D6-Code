@@ -148,8 +148,9 @@ def main():
             # Set up row
             base_row = {
                 "note_id": note_id,
+                "note_date": record.get("date", ""),
                 "model": model,
-                "created_at": created_at,
+                "pipeline_run_at": created_at,
                 "need_id": need["id"],
                 "need_label": need["label"],
                 "need_text": need.get("text", ""),
@@ -179,8 +180,8 @@ def main():
                     })
 
     # Convert to DataFrame and save to CSV
-    columns = ["note_id", "target_id", "target_type", "model", 
-        "created_at", "need_id", "need_label", "need_text", "start", "end", 
+    columns = ["note_id", "note_date", "target_id", "target_type", "model", 
+        "pipeline_run_at", "need_id", "need_label", "need_text", "start", "end", 
         "need_conf", "relation_conf", "linking_conf"
     ]
     df = pd.DataFrame(rows, columns=columns)

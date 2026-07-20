@@ -343,7 +343,8 @@ def generate_note(config, row):
     return pd.Series({
         "note_id": uuid4(), # new ID for confidentiality
         "note_content": note_content,
-        "note_category": row.note_category
+        "note_category": row.note_category,
+        "note_date": row.note_date
     })
 
 def main():

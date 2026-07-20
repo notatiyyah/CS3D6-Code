@@ -109,6 +109,7 @@ def predict_relations(data: List[dict], config: Config) -> Dict[str, dict]:
         predictions.append({
             "id": doc["id"],
             "text": text,
+            "date": doc.get("date"),
             "model": doc.get("model", "oracle") + "_" + config.run_name, # Either spanModel_relationModel or oracle_relationModel
             "needs": needs,
             "persons": persons,

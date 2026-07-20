@@ -86,11 +86,13 @@ def main():
 
         stripped_records.append({
             "id": uuid4(),
+            "date": r["note_date"],
             "category": category,
             "need_labels": needs,
             "entity_labels": persons,
             "relation_count": len(r["relations"]),
             "note_length_range": f"{lowerBound}-{upperBound}",
+            "tenure_count": len(r["tenure_ids"]),
             "household_roster": extract_household_members(r, config.logger),
         })
 

@@ -8,6 +8,7 @@ import json
 import re
 from dataclasses import dataclass
 import pandas as pd
+from uuid import uuid4
 
 from common.paths import PROCESSED, RAW
 from common.json_helpers import load_json, is_valid_json, save_json
@@ -30,7 +31,7 @@ def export_spans_from_tagged_text(row, tag_pattern, logger):
     gen_data = json.loads(raw_json)
 
     # Construct full text - same as in prep_gold_standard notebook.
-    full_text = f"[Category: {row.category}] {gen_data['title']} {gen_data['note']}"
+    full_text = f"[Category: {row.category}] {gen_data.get('title')} {gen_data.get('note')}"
     
     needs = []
     persons = []
@@ -52,9 +53,12 @@ def export_spans_from_tagged_text(row, tag_pattern, logger):
     return pd.Series({
         "id": row.id,
         "text": clean_full_text,
+        "date": row.date,
         "needs": needs,
         "persons": persons,
-        "relations": gen_data['relations'],
+        "relations": gen_data.get('relations', []),
+        "tenure_ids": [str(uuid4()) for _ in range(row.tenure_count)],
+        "household_members": gen_data.get('household_roster', []),
     })
 
 
@@ -62,7 +66,7 @@ def main():
     config = Config()
     # 1. Load Generated Data
     config.logger.info("Importing gemini generated data from %s", config.gemini_output)
-    df = pd.read_csv(config.gemini_output, sep="\t")
+    df = pd.read_csv(config.gemini_output, sep="\t", encoding="utf-8", encoding_errors='replace')
 
     # 2. Parse XML Tags and get character indexes/offsets
     # Regex for XML tags

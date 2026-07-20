@@ -82,6 +82,7 @@ def main():
         prediction = {
             "id": record['id'],
             "text": text,
+            "date": record.get("note_date"),
             "model": config.model_name,
             "needs": [x for x in doc_spans if x['label'] not in config.person_labels],
             "persons": [x for x in doc_spans if x['label'] in config.person_labels],
