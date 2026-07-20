@@ -116,7 +116,7 @@ The main preprocessing components are:
 The repository also contains `docs/reshaping_script/`, which contains the SQL and Python scripts originally used to collect and filter MMH notes data in Hackney's AWS data platform.
 
 These scripts:
-- execute an AWS Athena query to reshape notes data;
+- execute an AWS Athena query to ingest and reshape notes data;
 - join notes with tenancy information;
 - apply data quality and business logic flags;
 - write the resulting dataset to S3 as Parquet and register it in AWS Glue.

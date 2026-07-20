@@ -1,9 +1,9 @@
 """
-This script reshapes MTFH notes data and writes the results to S3 as Parquet,
-registering the output table in the AWS Glue Data Catalog.
+This script ingests MTFH notes data and MTFH tenure data combines them,
+and writes the results to S3 as Parquet, registering the output table in the AWS Glue Data Catalog.
 
 The pipeline handles:
-- Loading and executing the notes_reshape.sql query via AWS Athena
+- Loading and executing the notes_ingest.sql query via AWS Athena
 - Joining notes to tenures via tenure ID, asset ID, or person ID
 - Appending data quality and business logic flags (e.g., inactive tenancies, organizational targets, missing targets) for downstream metrics
 - Writing the results to S3 as Snappy-compressed Parquet
@@ -64,7 +64,7 @@ def main() -> int:
         return 1
 
     logger.info("Starting MTFH Additional Needs Notes Reshaping.")
-    sql = load_sql_from_file("notes_reshape.sql")
+    sql = load_sql_from_file("notes_ingest.sql")
 
     logger.info(f"Executing Athena query for tables: {SOURCE_DATABASE}.mtfh_notes, {SOURCE_DATABASE}.mtfh_tenureinformation")
     df = wr.athena.read_sql_query(
