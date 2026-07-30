@@ -11,13 +11,15 @@ from tabulate import tabulate
 from common.paths import VAL_DATA, TEST_DATA, METRICS, PREDICTIONS
 from common.logging import setup_logger
 from common.json_helpers import load_json, save_json
-from shared.evaluators import SpanEvaluator
+from common.graph_helpers import plot_confusion_matrix
+from shared.evaluators import SpanEvaluator, build_confusion_matrix
+
 
 
 @dataclass
 class Config:
     val_path: Path = TEST_DATA
-    methods: List[str] = field(default_factory=lambda: ["regex", "span-classifier-4", "comprehend", "gemini"]) # TODO: Make this into arg.
+    methods: List[str] = field(default_factory=lambda: ["regex", "span-classifier-4-dupe", "span-classifier-4", "comprehend", "gemini"]) # TODO: Make this into arg.
 
     def __post_init__(self):
         self.logger = setup_logger("eval.spans", "eval_spans.log")
@@ -134,21 +136,22 @@ def main():
         predictions = all_predictions[method]
 
         # Populate y_true and y_pred (list of lists of tuples)
-        y_true = []
-        y_pred = []
+        y_true, y_pred = [], []
 
         for record_id, true_spans in y_true_by_id.items():
             y_true.append(true_spans)
-            if record_id in predictions:
-                pred_spans = convert_preds_to_tuples(predictions[record_id])
-            else:
-                pred_spans = []
+            pred_spans = convert_preds_to_tuples(predictions.get(record_id, {}))
             y_pred.append(pred_spans)
 
         results = evaluator.evaluate(y_true, y_pred)
         results_by_method[method] = results
-
         evaluator.print_report(results, title=f"SPAN METRICS ({method.upper()})")
+
+        cm = build_confusion_matrix(y_true, y_pred, all_labels, SpanEvaluator._score_loose)
+        cm.to_csv(METRICS / f"confusion_{method}.csv")
+        config.logger.info('Saved confusion matrix to %s.', (METRICS / f"confusion_{method}.csv"))
+        plot_confusion_matrix(cm, f"Confusion Matrix — {method}", METRICS / f"confusion_{method}.png")
+
 
     # Save full results
     save_json(path=config.results_path, data=results_by_method, logger=config.logger)

@@ -107,7 +107,7 @@ def analyze_category_distribution_from_df(df: pd.DataFrame,
     return irlbl_df, summary_df, ax
 
 
-def plot_cooccurrence_heatmap(data, taxonomy_df, figsize: Tuple[int, int] = (13, 13)) -> plt.Axes: # type: ignore
+def plot_cooccurrence_heatmap(data, taxonomy_df, figsize: Tuple[int, int] = (13, 13), show_annot: bool = False) -> plt.Axes: # type: ignore
     """
     Plot a normalized co-occurrence heatmap for multi-label categories.
     """
@@ -141,7 +141,7 @@ def plot_cooccurrence_heatmap(data, taxonomy_df, figsize: Tuple[int, int] = (13,
     ax = sns.heatmap(
         normalized_matrix,
         cmap='Blues',
-        annot=False,
+        annot=show_annot,
         linewidths=0.5,
         linecolor="lightgrey",
         vmin=0,
@@ -156,3 +156,17 @@ def plot_cooccurrence_heatmap(data, taxonomy_df, figsize: Tuple[int, int] = (13,
     plt.tight_layout()
     plt.show()
     return ax
+
+
+
+
+def plot_confusion_matrix(matrix, title, output_path, figsize: Tuple[int, int] = (15, 15)):
+    """Heatmap of the confusion matrix."""
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(matrix, annot=True, fmt="d", cmap="Blues", ax=ax, cbar=True)
+    ax.set_xlabel("Predicted label")
+    ax.set_ylabel("Gold label")
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=200)
+    plt.close(fig)

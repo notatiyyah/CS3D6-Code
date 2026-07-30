@@ -64,6 +64,8 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -e .
+pip install -r requirements.txt
+
 ```
 
 This installs the project and all required dependencies specified in `pyproject.toml`.

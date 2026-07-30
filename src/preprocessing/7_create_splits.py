@@ -69,7 +69,7 @@ def expand(indices, texts, lookup, records):
 
 def main():
     config = Config()
-    config.logger.info("Starting train/test/validation split (70/30/30)...")
+    config.logger.info("Starting train/test/validation split (70/15/15)...")
 
     # Load data
     records = load_json(config.input_data_path, config.logger)

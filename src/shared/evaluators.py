@@ -2,8 +2,56 @@ import numpy as np
 from tabulate import tabulate
 from collections import defaultdict
 from sklearn.metrics import f1_score, precision_score, recall_score
+import pandas as pd
 
 from common.data_utils import span_iou
+
+
+def build_confusion_matrix(y_true_docs, y_pred_docs, all_labels, match_fn):
+    """
+    Builds a label x label confusion matrix based on span overlap matching. 
+
+    Rows = gold label, Columns = predicted label.
+    Adds 'MISSED' column (gold span had no matching prediction) and
+    'FALSE' row (predicted span had no matching gold).
+    """
+    labels = list(all_labels) + ["FALSE"]    # rows
+    cols = list(all_labels) + ["MISSED"]     # columns
+    matrix = pd.DataFrame(0, index=labels, columns=cols)
+
+    for true_spans, pred_spans in zip(y_true_docs, y_pred_docs):
+        # Match spans
+        candidates = []
+        for pi, (p_start, p_end, p_label) in enumerate(pred_spans):
+            for ti, (t_start, t_end, t_label) in enumerate(true_spans):
+                iou = span_iou(p_start, p_end, t_start, t_end)
+                if iou > 0:
+                    candidates.append((iou, pi, ti))
+
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        used_t, used_p = set(), set()
+
+        # build matrix without double counting
+        for iou, pi, ti in candidates:
+            if ti in used_t or pi in used_p:
+                continue
+            used_t.add(ti)
+            used_p.add(pi)
+            t_label = true_spans[ti][2]
+            p_label = pred_spans[pi][2]
+            if t_label in all_labels and p_label in all_labels: # Handle gemini which has extra labels not in gold
+                matrix.loc[t_label, p_label] += 1
+
+        # add complete misses
+        for ti, (_, _, t_label) in enumerate(true_spans):
+            if ti not in used_t and t_label in all_labels:
+                matrix.loc[t_label, "MISSED"] += 1
+
+        for pi, (_, _, p_label) in enumerate(pred_spans):
+            if pi not in used_p and p_label in all_labels:
+                matrix.loc["FALSE", p_label] += 1
+
+    return matrix
 
 class SpanEvaluator():
     """
@@ -48,7 +96,7 @@ class SpanEvaluator():
             for ti, (t_start, t_end, t_label) in enumerate(true_spans):
                 if p_label != t_label:
                     continue
-                score = score_fn(p_start, p_end, t_start, t_end)
+                score = span_iou(p_start, p_end, t_start, t_end)
                 # Must have a score strictly > 0 (meaning overlap exists) and meet the threshold
                 if score > 0 and score >= threshold:
                     candidates.append((score, ti, pi, p_label))

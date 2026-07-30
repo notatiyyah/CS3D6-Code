@@ -1,6 +1,5 @@
 import logging
 from common.paths import LOGS
-from transformers import TrainerCallback
 
 def setup_logger(name: str, log_file_name: str | None = None) -> logging.Logger:
     logger = logging.getLogger(name)
@@ -32,7 +31,7 @@ def setup_logger(name: str, log_file_name: str | None = None) -> logging.Logger:
 
     return logger
 
-class FileLogCallback(TrainerCallback):
+class FileLogCallback():
     """Forwards Trainer's per-step/per-epoch log dicts (loss, eval f1, etc.)
     into our own file logger, since HF's progress bar + internal logger
     don't write to it by default."""
