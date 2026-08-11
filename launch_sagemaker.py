@@ -4,7 +4,6 @@ Bundles up the src/ folder and sends it to the docker container (ml.g5.xlarge) t
 Note: Can be tested locally using Docker if you set config.is_local to True. 
 However, you still need AWS credentials to run locally since it requires AWS ECR (Elastic Container Repository) to download the container images.
 '''
-
 from boto3 import session as boto_session
 
 from sagemaker.local import LocalSession

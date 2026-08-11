@@ -19,7 +19,7 @@ from shared.evaluators import SpanEvaluator, build_confusion_matrix
 @dataclass
 class Config:
     val_path: Path = TEST_DATA
-    methods: List[str] = field(default_factory=lambda: ["regex", "span-classifier-4-dupe", "span-classifier-4", "comprehend", "gemini"]) # TODO: Make this into arg.
+    methods: List[str] = field(default_factory=lambda: ["regex", "comprehend", "span-classifier-4"]) # TODO: Make this into arg.
 
     def __post_init__(self):
         self.logger = setup_logger("eval.spans", "eval_spans.log")

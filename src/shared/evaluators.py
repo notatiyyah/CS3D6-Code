@@ -96,7 +96,7 @@ class SpanEvaluator():
             for ti, (t_start, t_end, t_label) in enumerate(true_spans):
                 if p_label != t_label:
                     continue
-                score = span_iou(p_start, p_end, t_start, t_end)
+                score = score_fn(p_start, p_end, t_start, t_end)
                 # Must have a score strictly > 0 (meaning overlap exists) and meet the threshold
                 if score > 0 and score >= threshold:
                     candidates.append((score, ti, pi, p_label))
