@@ -1,0 +1,65 @@
+# Local / DCS training and evaluation dependencies.
+# SageMaker training jobs use requirements-sagemaker.txt instead.
+
+# ==========================================
+# PyTorch (Install whichever version suits your system)
+# ==========================================
+# torch>=2.6.0
+# torchvision
+# torchaudio
+
+# ==========================================
+# Data Processing & Splitting
+# ==========================================
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.5.2
+iterative-stratification==0.1.7
+seaborn
+pandarallel
+
+evaluate
+seqeval
+
+# Hugging Face
+datasets==2.18.0
+pyarrow==14.0.2
+transformers==4.46.3
+accelerate==0.34.2
+safetensors==0.4.5
+
+# DeBERTa Dependencies
+sentencepiece
+protobuf
+
+# PII redaction
+presidio_analyzer
+presidio_anonymizer
+
+# ==========================================
+# Diagnostics & Visualisation
+# ==========================================
+matplotlib
+seaborn
+tqdm
+
+# ==========================================
+# Notebooks
+# ==========================================
+jupyter
+ipykernel
+
+# ==========================================
+# Utilities
+# ==========================================
+click
+nltk
+tabulate
+ftfy
+
+# ==========================================
+# AWS
+# ==========================================
+boto3
+awswrangler
+sagemaker

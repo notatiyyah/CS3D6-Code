@@ -24,31 +24,36 @@ The remaining machine learning and evaluation components can be run locally or u
 
 ## Repository Structure
 
-Python code is in `src/`, with source code separated by task. All commands should be run from the **repository root**.
+This is a **monorepo**. Each package owns its own `pyproject.toml` and `requirements.txt` — there is no root Python package.
+
+- `dev/` — training, preprocessing, evaluation, and experimentation
+- `inference/` — production batch inference container (SageMaker / Airflow)
 
 ```text
 .
-├── data/
-│   ├── logs/                     Log files
-│   ├── models/                   Trained model checkpoints and final models
-│   ├── processed/                Processed datasets used for training and evaluation
-│   ├── raw/                      Original uploads: annotation exports and taxonomy files
-│   └── results/                  Evaluation metrics and model predictions
-│
-├── docs/                         Supporting documentation and non-functional scripts 
-├── visualizer/                   React application for visualising predictions
-│
-├── src/
+├── data/                         Datasets, models, logs, and evaluation outputs
+├── docs/                         Supporting documentation
+├── inference/                    Production inference container
+│   ├── src/                      Runtime package (models, linker, schemas, entrypoint)
+│   ├── tests/                    Fast unit tests (pytest)
+│   ├── Dockerfile
+│   ├── pyproject.toml
+│   └── requirements.txt
+├── dev/                          Training and evaluation
 │   ├── common/                   Shared utilities (paths, logging, JSON helpers)
-│   ├── entity_linking/           Entity linking script
-│   ├── preprocessing/            Preprocessing scripts (ordered) - mix of scripts and notebooks
+│   ├── preprocessing/            Preprocessing scripts and notebooks
 │   ├── spans/                    Span extraction training and evaluation
 │   ├── relations/                Relation extraction training and evaluation
+│   ├── entity_linking/           Experimental entity linking scripts
 │   ├── shared/                   Shared model implementations and evaluators
-│   └── sagemaker_entrypoint.py   Entrypoint for sagemaker scripts *(non-functional without AWS)*
-│
-└── launch_sagemaker.py           Sagemaker training job launch script *(non-functional without AWS)*
+│   ├── pyproject.toml
+│   ├── requirements.txt
+│   └── launch_sagemaker.py       SageMaker training job launcher *(requires AWS)*
+├── visualizer/                   React application for visualising predictions
+└── .github/workflows/            CI (inference tests only)
 ```
+
+Install and run each package from **inside that directory**.
 
 ---
 
@@ -56,25 +61,30 @@ Python code is in `src/`, with source code separated by task. All commands shoul
 
 The project uses **Python 3.12**.
 
-Create a virtual environment, and install the package from the repository root.
+### Training / evaluation (`dev/`)
 
 ```bash
 python -m venv .venv
-
 source .venv/bin/activate
 
+cd dev
 pip install -e .
 pip install -r requirements.txt
-
 ```
 
-This installs the project and all required dependencies specified in `pyproject.toml`.
+### Production inference (`inference/`)
+
+```bash
+cd inference
+pip install -e .
+pip install -r requirements-dev.txt   # runtime + pytest
+```
 
 The visualiser component uses React and Javascript. This requires **Node v24+**.
 
 Installation:
 ```bash
-cd visualiser
+cd visualizer
 
 npm install
 ```
@@ -90,8 +100,6 @@ The remaining components, including data preprocessing, inference, evaluation, a
 Refer to the official [PyTorch installation guide](https://pytorch.org/get-started/locally/) for installation instructions for your platform.
 
 See the DCS Batch Compute System guide: https://warwick.ac.uk/fac/sci/dcs/intranet/user_guide/batch_compute/
-
-<!-- Model evaluation and the visualiser can be run without retraining the models using the supplied artefacts. TODO: Remove if not including. --> 
 
 ---
 
@@ -129,6 +137,8 @@ They are included for documentation and reproducibility context only. They are *
 
 ### Training
 
+Commands in this section are run from `dev/` after installing that package.
+
 The project contains implementations of the transformer-based models evaluated in the dissertation:
 
 - span classification for Additional Needs entity extraction;
@@ -137,15 +147,15 @@ The project contains implementations of the transformer-based models evaluated i
 Training scripts are located under:
 
 ```bash
-python src/spans/training/train_span.py
-python src/relations/training/relation_extraction.py
+python spans/training/train_span.py
+python relations/training/relation_extraction.py
 ```
 
 Training configuration is defined using dataclasses at the top of each training script.
 
 The span model also includes a separate threshold sweep script:
 ```bash
-python src/spans/training/optimize_thresholds.py <data/model/model_name/final_model>
+python spans/training/optimize_thresholds.py <path/to/final_model>
 ```
 
 Training is computationally expensive and GPU acceleration is recommended.
@@ -168,7 +178,7 @@ Evaluation is split into two stages:
 
 Prediction scripts are located under:
 ```bash
-python src/spans/eval/predict_*.py [<data/results/predicted/file>]
+python spans/eval/predict_*.py [<data/results/predicted/file>]
 ```
 These scripts generate predictions for the different approaches evaluated in the dissertation, including:
 
@@ -183,7 +193,7 @@ These scripts generate predictions for the different approaches evaluated in the
 
 Relation evaluation is located under:
 ```bash
-python src/relations/eval/predict_*.py
+python relations/eval/predict_*.py
 ```
 The relation evaluation scripts support evaluating entity attribution using either:
 
@@ -197,14 +207,12 @@ Using predicted spans helps measure cascading errors.
 Evaluation does not require GPU acceleration (the span model takes ~5 minutes on CPU; the relation model ~10 minutes). 
 
 #### Entity Linking
-The entity linking stage assigns extracted Additional Needs mentions to household members using rule-based matching.
+Production entity linking lives in `inference/src/models/entity_linker.py` (deterministic heuristics, no model weights).
 
-The script:
+The evaluation script that writes CSV for the visualiser is:
 ```bash
-src/entity_linking/match_needs_to_persons.py
+python entity_linking/match_needs_to_persons.py
 ```
-takes extracted needs, relations, and household information and outputs attribution results in a tabular format (CSV).
-
 It is not quantitatively evaluated due to a lack of annotated ground truth data. Results can be manually inspected using the visualiser (See below).
 
 ## Visualiser

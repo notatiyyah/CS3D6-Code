@@ -1,4 +1,4 @@
-# --- SageMaker Training Dependencies ---
+# Installed by the SageMaker PyTorch training estimator (see launch_sagemaker.py).
 numpy<2.0.0
 scikit-learn==1.5.2
 evaluate
@@ -12,7 +12,3 @@ datasets==2.18.0
 # DeBERTa-v3 specific requirements
 sentencepiece
 protobuf
-
-# spacy>=3.7.0
-# spacy-transformers
-# cupy-cuda12x

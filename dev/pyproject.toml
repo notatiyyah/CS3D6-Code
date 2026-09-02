@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "additional-needs-dev"
+version = "0.1.0"
+description = "Training, preprocessing, and evaluation for Additional Needs extraction"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["common*", "shared*", "preprocessing*", "spans*", "relations*", "entity_linking*"]
+namespaces = true
